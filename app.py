@@ -13,7 +13,7 @@ creds = Credentials.from_service_account_info(creds_dict)
 client_gs = gspread.authorize(creds)
 
 # Nhập SHEET_ID (Google Sheets URL dạng: https://docs.google.com/spreadsheets/d/xxxxxxx/edit)
-SHEET_ID = "1nMhTwPKYU_1k1SFUZKaeZTLlXlqcWk2cC4kahQ_Kpg"
+SHEET_ID = "1nMhTwPKYU_Ik1SFUZKaeZTLUXlqcWk2cC4kahQ_RKpg"
 sheet = client_gs.open_by_key(SHEET_ID).sheet1
 
 # Đọc dữ liệu thành DataFrame
