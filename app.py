@@ -1,81 +1,71 @@
 ﻿import streamlit as st
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from openai import OpenAI
+from google.oauth2.service_account import Credentials
+import openai
+import pandas as pd
 
-# =========================
-# 1. KẾT NỐI GOOGLE SHEETS
-# =========================
-# Lấy key service account từ Secrets
+# --- Kết nối Google Sheets ---
+st.title("📘 Quản lý điểm học sinh bằng AI")
+
+# Lấy Google Service Account từ secrets
 creds_dict = dict(st.secrets["google_service_account"])
-
-scope = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive"
-]
-
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+creds = Credentials.from_service_account_info(creds_dict)
 client_gs = gspread.authorize(creds)
 
-# Thay bằng ID Google Sheet của bạn
-SHEET_ID = "1nMhTwPKYU_Ik1SFUZKaeZTLUXlqcWk2cC4kahQ_RKpg"
+# Nhập SHEET_ID (Google Sheets URL dạng: https://docs.google.com/spreadsheets/d/xxxxxxx/edit)
+SHEET_ID = "1nMhTwPKYU_1k1SFUZKaeZTLlXlqcWk2cC4kahQ_Kpg"
 sheet = client_gs.open_by_key(SHEET_ID).sheet1
-records = sheet.get_all_records()
 
-# =========================
-# 2. KẾT NỐI OPENAI
-# =========================
-openai_key = st.secrets["OPENAI_API_KEY"]
-client_ai = OpenAI(api_key=openai_key)
+# Đọc dữ liệu thành DataFrame
+data = sheet.get_all_records()
+df = pd.DataFrame(data)
 
-def generate_comment(student, week):
-    """Sinh nhận xét từ dữ liệu học sinh"""
-    prompt = f"""
-    Đây là dữ liệu tuần {week} của học sinh:
-    {student}
+st.subheader("📊 Bảng điểm hiện tại")
+st.dataframe(df)
 
-    Hãy viết báo cáo ngắn gọn gửi cho phụ huynh gồm:
-    - Các môn học tốt
-    - Các môn còn hạn chế
-    - Lời khuyên ngắn gọn để phụ huynh hỗ trợ con
-    """
-    response = client_ai.chat.completions.create(
-        model="gpt-4o-mini",   # có thể thay bằng "gpt-4o" nếu cần
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.6
-    )
-    return response.choices[0].message.content
+# --- Chức năng tra cứu ---
+st.subheader("🔍 Tra cứu điểm học sinh")
+student_name = st.text_input("Nhập tên học sinh:")
 
-def get_student_data(student_id, week):
-    """Tìm dữ liệu học sinh theo ID + tuần"""
-    student_records = [r for r in records if str(r.get("Mã HS", "")).strip() == str(student_id).strip()]
-    
-    if not student_records:
-        return None
-    
-    if 1 <= int(week) <= len(student_records):
-        return student_records[int(week) - 1]
+if student_name:
+    results = df[df["Họ tên"].str.contains(student_name, case=False)]
+    if not results.empty:
+        st.write("✅ Kết quả tìm thấy:")
+        st.dataframe(results)
     else:
-        return None
+        st.warning("Không tìm thấy học sinh này.")
 
-# =========================
-# 3. GIAO DIỆN STREAMLIT
-# =========================
-st.image("logo.png", caption="Hệ thống nhận xét học sinh", use_column_width=True)
-st.title("📊 Hệ thống nhận xét học sinh (AI + Google Sheets)")
+# --- Tích hợp AI để tư vấn ---
+st.subheader("🤖 Hỏi AI về kết quả học tập")
 
-uploaded_file = st.file_uploader("📷 Tải ảnh học sinh", type=["png", "jpg", "jpeg"])
-if uploaded_file is not None:
-    st.image(uploaded_file, caption="Ảnh học sinh", use_column_width=True)
+question = st.text_area("Nhập câu hỏi (ví dụ: Nhận xét về Nguyễn Văn A):")
 
-student_id = st.text_input("Nhập Mã HS:")
-week = st.text_input("Nhập tuần (ví dụ: 1, 2, 3):")
-
-if st.button("Xem kết quả"):
-    student = get_student_data(student_id, week)
-    if student:
-        comment = generate_comment(student, week)
-        st.success(f"✅ Nhận xét tuần {week}:")
-        st.write(comment)
+if st.button("Hỏi AI"):
+    if not question:
+        st.warning("Bạn cần nhập câu hỏi.")
     else:
-        st.error("❌ Không tìm thấy dữ liệu cho học sinh/tuần này.")
+        openai.api_key = st.secrets["OPENAI_API_KEY"]
+
+        # Tạo prompt từ dữ liệu
+        context = df.to_string(index=False)
+
+        prompt = f"""
+        Đây là bảng điểm của học sinh:
+        {context}
+
+        Câu hỏi: {question}
+
+        Hãy trả lời rõ ràng, dễ hiểu cho phụ huynh.
+        """
+
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "system", "content": "Bạn là một cố vấn học tập."},
+                      {"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=500
+        )
+
+        answer = response.choices[0].message["content"]
+        st.success("💡 Trả lời của AI:")
+        st.write(answer)
