@@ -45,10 +45,13 @@ def ai_nhan_xet(thong_tin_hoc_sinh):
 
     try:
         response = openai.chat.completions.create(
-            model="gpt-4o-mini",  # hoặc gpt-4o nếu bạn muốn
-            messages=[
-                {"role": "system", "content": "Bạn là một giáo viên tâm huyết."},
-                {"role": "user", "content": prompt}]
+    model="gpt-4o-mini",  # hoặc gpt-4o nếu bạn muốn
+    messages=[
+        {"role": "system", "content": "Bạn là một giáo viên tâm huyết."},
+        {"role": "user", "content": prompt}
+    ]
+)
+
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
