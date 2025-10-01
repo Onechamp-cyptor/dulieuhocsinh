@@ -1,76 +1,111 @@
 ﻿import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
-import openai
 import pandas as pd
+import openai
 
-# --- K?t n?i Google Service Account ---
-creds_dict = dict(st.secrets["google_service_account"])
-creds = Credentials.from_service_account_info(creds_dict)
-client_gs = gspread.authorize(creds)
+# ---------------------------
+# Cấu hình Streamlit
+# ---------------------------
+st.set_page_config(page_title="Quản lý điểm học sinh", page_icon="📘", layout="wide")
+st.title("📘 Quản lý điểm học sinh (Google Sheets + AI)")
 
-# --- L?y OpenAI API key ---
-openai.api_key = st.secrets["openai"]["api_key"]
+# ---------------------------
+# Hàm tải dữ liệu Google Sheets
+# ---------------------------
+def load_data():
+    creds_dict = dict(st.secrets["google_service_account"])
+    creds = Credentials.from_service_account_info(
+        creds_dict,
+        scopes=[
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+    )
+    client = gspread.authorize(creds)
+    SHEET_ID = st.secrets["sheets"]["sheet_id"]
+    sheet = client.open_by_key(SHEET_ID).sheet1
+    data = sheet.get_all_records()
+    df = pd.DataFrame(data)
+    return sheet, df
 
-# --- L?y Sheet ID t? secrets ---
-SHEET_ID = st.secrets["sheets"]["sheet_id"]
+# ---------------------------
+# Hàm AI nhận xét học sinh
+# ---------------------------
+def ai_nhan_xet(thong_tin_hoc_sinh):
+    openai.api_key = st.secrets["openai"]["api_key"]
 
-# --- K?t n?i Google Sheet ---
-sheet = client_gs.open_by_key(SHEET_ID).sheet1
-data = sheet.get_all_records()
-df = pd.DataFrame(data)
+    prompt = f"""
+    Bạn là giáo viên chủ nhiệm. Đây là dữ liệu điểm của một học sinh:
 
-# --- Giao di?n ---
-st.title("?? Qu?n lý di?m h?c sinh b?ng AI")
+    {thong_tin_hoc_sinh.to_dict(orient="records")}
 
-st.subheader("?? B?ng di?m hi?n t?i")
-st.dataframe(df, use_container_width=True)
+    Hãy viết một đoạn nhận xét gửi phụ huynh: nêu rõ ưu điểm, hạn chế, và lời khuyên để cải thiện kết quả học tập.
+    """
 
-# --- Tra c?u h?c sinh ---
-st.subheader("?? Tra c?u di?m h?c sinh")
-student_name = st.text_input("Nh?p tên h?c sinh:")
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",  # hoặc gpt-4o nếu bạn muốn
+            messages=[
+                {"role": "system", "content": "Bạn là một giáo viên tâm huyết."},
+                {"role": "user", "content": prompt}
+import streamlit as st
+import gspread
+from google.oauth2.service_account import Credentials
+import pandas as pd
+import openai
 
-if student_name:
-    if "H? tên" in df.columns:
-        results = df[df["H? tên"].str.contains(student_name, case=False)]
-        if not results.empty:
-            st.success("? K?t qu? tìm th?y:")
-            st.dataframe(results, use_container_width=True)
+st.set_page_config(page_title="Quản lý học sinh", page_icon="📘", layout="wide")
+st.title("📘 Quản lý điểm học sinh")
+
+def load_data():
+    creds_dict = dict(st.secrets["google_service_account"])
+    creds = Credentials.from_service_account_info(
+        creds_dict,
+        scopes=["https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive"]
+    )
+    client = gspread.authorize(creds)
+    SHEET_ID = st.secrets["sheets"]["sheet_id"]
+    sheet = client.open_by_key(SHEET_ID).sheet1
+    data = sheet.get_all_records()
+    df = pd.DataFrame(data)
+    return sheet, df
+
+def ai_nhan_xet(thong_tin):
+    openai.api_key = st.secrets["openai"]["api_key"]
+    prompt = f"Hãy viết nhận xét gửi phụ huynh dựa trên dữ liệu: {thong_tin.to_dict(orient='records')}"
+    resp = openai.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "system", "content": "Bạn là giáo viên"},
+                  {"role": "user", "content": prompt}],
+        max_tokens=300
+    )
+    return resp.choices[0].message["content"]
+
+try:
+    if st.button("🔄 Làm mới dữ liệu"):
+        sheet, df = load_data()
+        st.dataframe(df)
+
+        st.subheader("🔍 Tra cứu")
+        student_id = st.text_input("Nhập ID")
+        student_name = st.text_input("Hoặc nhập tên")
+
+        results = None
+        if student_id:
+            results = df[df["ID"].astype(str) == student_id]
+        elif student_name:
+            results = df[df["Họ tên"].str.contains(student_name, case=False)]
+
+        if results is not None and not results.empty:
+            st.dataframe(results)
+            if st.button("📌 Nhận xét phụ huynh"):
+                st.write(ai_nhan_xet(results))
         else:
-            st.warning("?? Không tìm th?y h?c sinh này.")
-    else:
-        st.error("? Không tìm th?y c?t 'H? tên' trong Google Sheet!")
+            st.info("⚠️ Không tìm thấy học sinh")
 
-# --- Tích h?p AI ---
-st.subheader("?? H?i AI v? k?t qu? h?c t?p")
-question = st.text_area("Nh?p câu h?i (ví d?: Nh?n xét v? Nguy?n Van A):")
+except Exception as e:
+    st.error("❌ Lỗi kết nối Google Sheets")
+    st.exception(e)
 
-if st.button("H?i AI"):
-    if not question:
-        st.warning("?? B?n c?n nh?p câu h?i.")
-    else:
-        context = df.to_string(index=False)
-        prompt = f"""
-        Ðây là b?ng di?m c?a h?c sinh:
-        {context}
-
-        Câu h?i: {question}
-
-        Hãy tr? l?i rõ ràng, d? hi?u cho ph? huynh.
-        """
-
-        try:
-            response = openai.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "B?n là m?t c? v?n h?c t?p."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=500
-            )
-            answer = response.choices[0].message.content
-            st.success("?? Tr? l?i c?a AI:")
-            st.write(answer)
-        except Exception as e:
-            st.error(f"? L?i khi g?i AI: {e}")
