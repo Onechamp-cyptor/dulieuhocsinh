@@ -40,21 +40,25 @@ def load_data():
 def ai_nhan_xet(thong_tin):
     try:
         openai.api_key = st.secrets["openai"]["api_key"]
+
         prompt = f"""
-        Bạn là giáo viên chủ nhiệm. Đây là dữ liệu điểm của học sinh:
+        Bạn là giáo viên chủ nhiệm. Đây là dữ liệu chi tiết của học sinh:
 
         {thong_tin.to_dict(orient="records")}
 
-        Hãy viết nhận xét gửi phụ huynh: nêu rõ ưu điểm, hạn chế và lời khuyên.
+        Hãy viết nhận xét gửi phụ huynh, trong đó:
+        - Phân tích kết quả học tập (ưu điểm và hạn chế).
+        - Nhận xét mức độ tham gia phong trào, vệ sinh lớp, phát biểu xây dựng bài... (dựa vào các cột có dấu tick ✓ hoặc TRUE/FALSE).
+        - Đưa ra lời khuyên cụ thể để giúp học sinh tiến bộ hơn.
         """
 
         resp = openai.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Bạn là một giáo viên tâm huyết."},
+                {"role": "system", "content": "Bạn là một giáo viên chủ nhiệm tận tâm, viết nhận xét rõ ràng, thân thiện và chi tiết."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=300
+            max_tokens=400
         )
         return resp.choices[0].message.content
 
@@ -75,9 +79,15 @@ if df is not None:
 
     results = None
     if student_id:
-        results = df[df["ID"].astype(str) == student_id]
+        if "ID" in df.columns:
+            results = df[df["ID"].astype(str) == student_id]
+        else:
+            st.warning("⚠️ Google Sheets chưa có cột 'ID'")
     elif student_name:
-        results = df[df["Họ tên"].str.contains(student_name, case=False)]
+        if "Họ tên" in df.columns:
+            results = df[df["Họ tên"].str.contains(student_name, case=False)]
+        else:
+            st.warning("⚠️ Google Sheets chưa có cột 'Họ tên'")
 
     if results is not None and not results.empty:
         st.dataframe(results)
