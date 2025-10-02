@@ -29,6 +29,11 @@ def load_data():
         sheet = client.open_by_key(SHEET_ID).sheet1
         data = sheet.get_all_records()
         df = pd.DataFrame(data)
+
+        # Điền ID và Họ tên xuống các dòng trống (fix chỉ hiện 1 dòng T2)
+        if {"ID", "Họ tên"}.issubset(df.columns):
+            df[["ID", "Họ tên"]] = df[["ID", "Họ tên"]].ffill()
+
         return sheet, df
     except Exception as e:
         st.error("❌ Lỗi tải dữ liệu Google Sheets")
@@ -91,7 +96,7 @@ def ai_nhan_xet(thong_tin):
 sheet, df = load_data()
 
 if df is not None:
-    # KHÔNG dropna để giữ nguyên tất cả các dòng (T2→T7)
+    # Chuyển ID sang string
     if "ID" in df.columns:
         df["ID"] = df["ID"].astype(str)
 
@@ -188,4 +193,3 @@ if df is not None:
 
             st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
             st.dataframe(top4[["ID", "Họ tên", "Tổng điểm tuần"]])
-
