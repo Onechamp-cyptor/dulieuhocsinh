@@ -28,11 +28,14 @@ def load_data():
         SHEET_ID = st.secrets["sheets"]["sheet_id"]
         sheet = client.open_by_key(SHEET_ID).sheet1
 
-        # Lấy toàn bộ dữ liệu kể cả dòng trống
+        # Lấy toàn bộ dữ liệu (kể cả dòng trống do merge)
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
 
-        # Điền ID và Họ tên xuống các dòng trống (fix chỉ hiện 1 dòng T2)
+        # Thay "" thành None để ffill hoạt động
+        df = df.replace("", None)
+
+        # Điền ID và Họ tên xuống các dòng trống
         if {"ID", "Họ tên"}.issubset(df.columns):
             df[["ID", "Họ tên"]] = df[["ID", "Họ tên"]].ffill()
 
@@ -51,6 +54,7 @@ def xu_ly_du_lieu(thong_tin):
         df[col] = df[col].replace({
             "✓": "Đạt (+20 điểm)",
             "X": "Chưa đạt (-30 điểm)",
+            None: "Không ghi nhận",
             "": "Không ghi nhận",
             True: "Có (✓)",
             False: "Không"
