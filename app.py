@@ -3,7 +3,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 import openai
-import altair as alt
+import plotly.express as px
 
 # ---------------------------
 # Cấu hình Streamlit
@@ -29,6 +29,16 @@ def load_data():
         sheet = client.open_by_key(SHEET_ID).sheet1
         data = sheet.get_all_records()
         df = pd.DataFrame(data)
+
+        # Nếu chưa có cột "Tổng điểm" thì tự tính
+        if "Tổng điểm" not in df.columns:
+            df["Tổng điểm"] = 0
+            for col in df.columns:
+                if col not in ["ID", "Họ tên", "Tuần", "Thứ", "Tổng điểm"]:
+                    df["Tổng điểm"] += df[col].apply(
+                        lambda x: 20 if str(x).strip() == "✓" else (-30 if str(x).strip() == "X" else 0)
+                    )
+
         return sheet, df
     except Exception as e:
         st.error("❌ Lỗi tải dữ liệu Google Sheets")
@@ -36,33 +46,17 @@ def load_data():
         return None, None
 
 # ---------------------------
-# Tính tổng điểm cho học sinh
-# ---------------------------
-def tinh_tong_diem(df):
-    df_out = df.copy()
-    df_out["Tổng điểm"] = 100  # điểm gốc
-
-    # Các tiêu chí tính điểm
-    for col in ["Đi học đúng giờ", "Đồng phục", "Thái độ", "Trật tự", "Vệ sinh", "Phong trào"]:
-        if col in df_out.columns:
-            df_out["Tổng điểm"] += df_out[col].apply(
-                lambda x: 20 if str(x).strip() == "✓" else (-30 if str(x).strip().upper() == "X" else 0)
-            )
-    return df_out
-
-# ---------------------------
 # Hàm AI nhận xét học sinh
 # ---------------------------
 def ai_nhan_xet(thong_tin):
     try:
         openai.api_key = st.secrets["openai"]["api_key"]
-
         prompt = f"""
         Bạn là giáo viên chủ nhiệm. Đây là dữ liệu chi tiết của học sinh:
 
         {thong_tin.to_dict(orient="records")}
 
-        Hãy viết nhận xét gửi phụ huynh, trong đó:
+        Hãy viết một nhận xét gửi phụ huynh, trong đó:
         - Nêu ưu điểm và hạn chế của học sinh.
         - Nhận xét về học tập, thái độ, kỷ luật, vệ sinh, tham gia phong trào...
         - Đưa ra lời khuyên cụ thể để giúp học sinh tiến bộ hơn.
@@ -71,13 +65,12 @@ def ai_nhan_xet(thong_tin):
         resp = openai.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Bạn là một giáo viên chủ nhiệm tận tâm, viết nhận xét rõ ràng, thân thiện và chi tiết."},
+                {"role": "system", "content": "Bạn là giáo viên chủ nhiệm tận tâm, viết nhận xét rõ ràng, thân thiện và chi tiết."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=400
         )
         return resp.choices[0].message.content
-
     except Exception as e:
         st.error("❌ Lỗi khi gọi OpenAI API")
         st.exception(e)
@@ -89,13 +82,10 @@ def ai_nhan_xet(thong_tin):
 sheet, df = load_data()
 
 if df is not None:
-    # Tính tổng điểm cho từng học sinh
-    df = tinh_tong_diem(df)
+    menu = st.sidebar.radio("📌 Chọn chức năng", ["Tra cứu học sinh", "Thống kê lớp"])
 
-    menu = st.sidebar.radio("📌 Chọn chức năng", ["🔍 Tra cứu học sinh", "📊 Thống kê lớp"])
-
-    # ---------------- Tra cứu học sinh ----------------
-    if menu == "🔍 Tra cứu học sinh":
+    # ---- Tra cứu học sinh ----
+    if menu == "Tra cứu học sinh":
         st.subheader("🔍 Tra cứu học sinh")
         student_id = st.text_input("Nhập ID")
         student_name = st.text_input("Hoặc nhập tên")
@@ -123,30 +113,26 @@ if df is not None:
         else:
             st.info("⚠️ Không tìm thấy học sinh")
 
-    # ---------------- Thống kê lớp ----------------
-    elif menu == "📊 Thống kê lớp":
-        st.subheader("📊 Thống kê lớp học")
+    # ---- Thống kê lớp ----
+    elif menu == "Thống kê lớp":
+        st.subheader("📊 Dashboard lớp học")
 
-        # Điểm trung bình cả lớp
-        st.metric("Điểm trung bình cả lớp", round(df["Tổng điểm"].mean(), 2))
+        # Điểm trung bình
+        if "Tổng điểm" in df.columns:
+            st.metric("Điểm trung bình cả lớp", round(df["Tổng điểm"].mean(), 2))
 
-        # Biểu đồ số lần vi phạm theo tiêu chí
+        # Thống kê vi phạm (chỉ tính số lần bị "X")
+        cols_tc = [c for c in df.columns if c not in ["ID", "Họ tên", "Tuần", "Thứ", "Tổng điểm"]]
         vi_pham = {}
-        for col in ["Đi học đúng giờ", "Đồng phục", "Thái độ", "Trật tự", "Vệ sinh", "Phong trào"]:
-            if col in df.columns:
-                vi_pham[col] = (df[col] == "X").sum()
+        for col in cols_tc:
+            vi_pham[col] = (df[col] == "X").sum()
+        vi_pham_df = pd.DataFrame(list(vi_pham.items()), columns=["Tiêu chí", "Số lần vi phạm"])
 
-        if vi_pham:
-            vi_pham_df = pd.DataFrame(list(vi_pham.items()), columns=["Tiêu chí", "Số lần vi phạm"])
-            st.write("### 📌 Số lần vi phạm theo tiêu chí")
-            chart = alt.Chart(vi_pham_df).mark_bar().encode(
-                x="Tiêu chí",
-                y="Số lần vi phạm",
-                color="Tiêu chí"
-            )
-            st.altair_chart(chart, use_container_width=True)
+        st.markdown("📌 **Số lần vi phạm theo tiêu chí**")
+        fig = px.bar(vi_pham_df, x="Tiêu chí", y="Số lần vi phạm", color="Tiêu chí", text="Số lần vi phạm")
+        st.plotly_chart(fig, use_container_width=True)
 
         # Top 4 học sinh điểm cao nhất
-        top_4_tot = df.sort_values("Tổng điểm", ascending=False).head(4)
-        st.write("### 🟢 Top 4 học sinh điểm cao nhất (Tuyên dương 🏆)")
-        st.table(top_4_tot[["Họ tên", "Tổng điểm"]])
+        st.markdown("🏆 **Top 4 học sinh điểm cao nhất (Tuyên dương)**")
+        top4 = df.groupby(["ID", "Họ tên"])["Tổng điểm"].sum().nlargest(4).reset_index()
+        st.table(top4)
