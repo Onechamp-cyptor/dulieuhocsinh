@@ -91,14 +91,11 @@ def ai_nhan_xet(thong_tin):
 sheet, df = load_data()
 
 if df is not None:
-
-    # Bỏ qua các hàng trống ID hoặc Họ tên
+    # Bỏ qua các hàng trống
     df = df.dropna(subset=["ID", "Họ tên"])
     df = df[df["Họ tên"].str.strip() != ""]
 
-    # Chuyển Tổng điểm / Tổng điểm tuần sang dạng số
-    if "Tổng điểm" in df.columns:
-        df["Tổng điểm"] = pd.to_numeric(df["Tổng điểm"], errors="coerce").fillna(0)
+    # Chuyển điểm về số
     if "Tổng điểm tuần" in df.columns:
         df["Tổng điểm tuần"] = pd.to_numeric(df["Tổng điểm tuần"], errors="coerce").fillna(0)
 
@@ -111,47 +108,44 @@ if df is not None:
         student_id = st.text_input("Nhập ID")
         student_name = st.text_input("Hoặc nhập tên")
 
-        # Chọn tuần (lấy unique từ cột Tuần)
-        if "Tuần" in df.columns:
-            weeks = sorted(df["Tuần"].dropna().unique(), key=lambda x: str(x))
-            selected_week = st.selectbox("📅 Chọn tuần", weeks)
-        else:
-            selected_week = None
+        # Lấy danh sách tuần hợp lệ
+        week_list = sorted(df["Tuần"].dropna().unique())
+        selected_week = st.selectbox("📅 Chọn tuần", week_list)
 
         results = None
         if student_id:
-            results = df[(df["ID"].astype(str) == student_id) & (df["Tuần"].astype(str) == str(selected_week))]
+            results = df[(df["ID"].astype(str) == student_id) & (df["Tuần"] == selected_week)]
         elif student_name:
-            results = df[(df["Họ tên"].str.contains(student_name, case=False)) & (df["Tuần"].astype(str) == str(selected_week))]
+            results = df[(df["Họ tên"].str.contains(student_name, case=False)) & (df["Tuần"] == selected_week)]
 
         if results is not None and not results.empty:
+            # Hiện chi tiết cả tuần T2 → T7
             st.subheader(f"📌 Chi tiết tuần {selected_week} (T2 → T7)")
-            st.dataframe(results)   # Hiện tất cả dòng trong tuần (T2→T7)
+            st.dataframe(results)
 
-            # Tính tổng điểm tuần
-            tong_tuan = results.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm"].sum()
-            tong_tuan = tong_tuan.rename(columns={"Tổng điểm": "Tổng điểm tuần"})
+            # Tính tổng điểm tuần (gom theo ID + Họ tên)
+            if "Tổng điểm tuần" in results.columns:
+                tong_diem = results.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm tuần"].sum()
+                st.subheader("📊 Tổng điểm tuần")
+                st.dataframe(tong_diem)
 
-            st.subheader("📊 Tổng điểm tuần")
-            st.dataframe(tong_tuan)
-
+            # Nhận xét AI
             if st.button("📌 Nhận xét phụ huynh"):
                 nhan_xet = ai_nhan_xet(results)
                 if nhan_xet:
                     st.success("✅ Nhận xét đã tạo:")
                     st.write(nhan_xet)
         else:
-            st.info("⚠️ Không tìm thấy học sinh trong tuần này")
+            st.info("⚠️ Không tìm thấy học sinh")
 
     # ------------------ THỐNG KÊ ------------------
     elif menu == "Thống kê lớp":
         st.subheader("📊 Thống kê lớp")
 
-        # Điểm trung bình
         if "Tổng điểm tuần" in df.columns:
             st.metric("Điểm trung bình cả lớp", round(df["Tổng điểm tuần"].mean(), 2))
 
-        # Số lần vi phạm theo tiêu chí
+        # Số lần vi phạm
         cols_check = ["Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
         vi_pham = {}
         for col in cols_check:
@@ -167,21 +161,15 @@ if df is not None:
             )
             st.plotly_chart(fig)
 
-        # Top 4 học sinh điểm cao nhất
+        # Top 4 học sinh
         if {"ID", "Họ tên", "Tổng điểm tuần"}.issubset(df.columns):
-            try:
-                top4 = (
-                    df.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm tuần"]
-                    .sum()
-                    .sort_values(by="Tổng điểm tuần", ascending=False)
-                    .head(4)
-                )
-                top4["Tổng điểm tuần"] = top4["Tổng điểm tuần"].astype(int)
+            top4 = (
+                df.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm tuần"]
+                .sum()
+                .sort_values(by="Tổng điểm tuần", ascending=False)
+                .head(4)
+            )
+            top4["Tổng điểm tuần"] = top4["Tổng điểm tuần"].astype(int)
 
-                st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
-                st.dataframe(top4[["ID", "Họ tên", "Tổng điểm tuần"]])
-            except Exception as e:
-                st.error("❌ Lỗi khi xử lý dữ liệu xếp hạng")
-                st.exception(e)
-
-
+            st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
+            st.dataframe(top4[["ID", "Họ tên", "Tổng điểm tuần"]])
