@@ -96,7 +96,7 @@ if df is not None:
     df = df.dropna(subset=["ID", "Họ tên"])
     df = df[df["Họ tên"].str.strip() != ""]
 
-    # Chuyển Tổng điểm tuần sang dạng số
+    # Chuyển Tổng điểm tuần sang dạng số (nếu có)
     if "Tổng điểm tuần" in df.columns:
         df["Tổng điểm tuần"] = pd.to_numeric(df["Tổng điểm tuần"], errors="coerce").fillna(0)
 
@@ -117,13 +117,25 @@ if df is not None:
                 st.warning("⚠️ Google Sheets chưa có cột 'ID'")
         elif student_name:
             if "Họ tên" in df.columns:
-                results = df[df["Họ tên"].str.contains(student_name, case=False)]
+                results = df[df["Họ tên"].str.contains(student_name, case=False, na=False)]
             else:
                 st.warning("⚠️ Google Sheets chưa có cột 'Họ tên'")
 
         if results is not None and not results.empty:
+            # Hiển thị chi tiết cả tuần (T2 -> CN)
+            st.write("📅 Chi tiết theo từng ngày")
             st.dataframe(results)
 
+            # Hiển thị tổng hợp điểm tuần
+            if "Tổng điểm" in results.columns:
+                tong_tuan = results.groupby(["ID", "Họ tên"])["Tổng điểm"].sum().reset_index()
+                tong_tuan.rename(columns={"Tổng điểm": "Tổng điểm tuần"}, inplace=True)
+                tong_tuan["Tổng điểm tuần"] = tong_tuan["Tổng điểm tuần"].astype(int)
+
+                st.write("📊 Tổng điểm tuần")
+                st.dataframe(tong_tuan)
+
+            # Nút nhận xét
             if st.button("📌 Nhận xét phụ huynh"):
                 nhan_xet = ai_nhan_xet(results)
                 if nhan_xet:
