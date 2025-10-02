@@ -3,5 +3,6 @@ gspread
 oauth2client
 pandas
 openai
+plotly
 
 
