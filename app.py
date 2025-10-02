@@ -91,10 +91,9 @@ def ai_nhan_xet(thong_tin):
 sheet, df = load_data()
 
 if df is not None:
-    # Bỏ qua các hàng trống
-    if {"ID", "Họ tên"}.issubset(df.columns):
-        df = df.dropna(subset=["ID", "Họ tên"])
-        df = df[df["Họ tên"].str.strip() != ""]
+    # KHÔNG dropna để giữ nguyên tất cả các dòng (T2→T7)
+    if "ID" in df.columns:
+        df["ID"] = df["ID"].astype(str)
 
     # Chuyển điểm về số
     if "Tổng điểm" in df.columns:
@@ -122,12 +121,12 @@ if df is not None:
         results = None
         if selected_week:
             if student_id:
-                results = df[(df["ID"].astype(str) == str(student_id)) & (df["Tuần"].astype(str) == str(selected_week))]
+                results = df[(df["ID"] == str(student_id)) & (df["Tuần"].astype(str) == str(selected_week))]
             elif student_name:
                 results = df[(df["Họ tên"].str.contains(student_name, case=False)) & (df["Tuần"].astype(str) == str(selected_week))]
 
         if results is not None and not results.empty:
-            # Sắp xếp theo thứ
+            # Sắp xếp theo Thứ
             if "Thứ" in results.columns:
                 thu_order = ["T2", "T3", "T4", "T5", "T6", "T7"]
                 results["Thứ"] = pd.Categorical(results["Thứ"], categories=thu_order, ordered=True)
@@ -189,5 +188,4 @@ if df is not None:
 
             st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
             st.dataframe(top4[["ID", "Họ tên", "Tổng điểm tuần"]])
-
 
