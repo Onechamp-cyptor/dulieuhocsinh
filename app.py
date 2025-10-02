@@ -78,7 +78,8 @@ else:
         # Điểm trung bình
         if "Tổng điểm tuần" in df.columns:
             try:
-                avg_score = df["Tổng điểm tuần"].dropna().astype(float).mean()
+                df["Tổng điểm tuần"] = pd.to_numeric(df["Tổng điểm tuần"], errors="coerce").fillna(0)
+                avg_score = df["Tổng điểm tuần"].mean()
                 st.metric("Điểm trung bình cả lớp", round(avg_score, 2))
             except:
                 st.warning("⚠️ Cột 'Tổng điểm tuần' có dữ liệu không hợp lệ")
@@ -108,9 +109,8 @@ else:
         if {"ID", "Họ tên", "Tổng điểm tuần"}.issubset(df.columns):
             try:
                 top4 = (
-                    df.groupby(["ID", "Họ tên"])["Tổng điểm tuần"]
-                    .max()  # lấy điểm cao nhất trong các tuần
-                    .reset_index()
+                    df.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm tuần"]
+                    .sum()  # cộng điểm các tuần
                     .sort_values(by="Tổng điểm tuần", ascending=False)
                     .head(4)
                 )
@@ -123,5 +123,4 @@ else:
                 st.exception(e)
         else:
             st.warning("⚠️ Thiếu cột ID, Họ tên hoặc Tổng điểm tuần trong Google Sheets")
-
 
