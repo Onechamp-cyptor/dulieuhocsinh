@@ -92,13 +92,13 @@ sheet, df = load_data()
 
 if df is not None:
 
-    # Bỏ qua các hàng trống ID hoặc Họ tên
+    # Bỏ qua các hàng trống
     df = df.dropna(subset=["ID", "Họ tên"])
     df = df[df["Họ tên"].str.strip() != ""]
 
-    # Chuyển Tổng điểm tuần sang dạng số
-    if "Tổng điểm tuần" in df.columns:
-        df["Tổng điểm tuần"] = pd.to_numeric(df["Tổng điểm tuần"], errors="coerce").fillna(0)
+    # Ép kiểu cột Tuần
+    if "Tuần" in df.columns:
+        df["Tuần"] = pd.to_numeric(df["Tuần"], errors="coerce").fillna(0).astype(int)
 
     # Sidebar chọn chức năng
     menu = st.sidebar.radio("📌 Chọn chức năng", ["Tra cứu học sinh", "Thống kê lớp"])
@@ -109,15 +109,10 @@ if df is not None:
         student_id = st.text_input("Nhập ID")
         student_name = st.text_input("Hoặc nhập tên")
 
-        # chọn tuần
+        selected_week = None
         if "Tuần" in df.columns:
-            try:
-                weeks = sorted(pd.to_numeric(df["Tuần"], errors="coerce").dropna().unique())
-            except:
-                weeks = df["Tuần"].unique()
+            weeks = sorted(df["Tuần"].dropna().unique())
             selected_week = st.selectbox("📅 Chọn tuần", weeks)
-        else:
-            selected_week = None
 
         results = None
         if student_id:
@@ -126,29 +121,21 @@ if df is not None:
             results = df[df["Họ tên"].str.contains(student_name, case=False)]
 
         if results is not None and not results.empty:
-            # lọc theo tuần
             if selected_week is not None:
-                results = results[results["Tuần"] == selected_week]
-
-            # lọc chỉ từ T2 -> T7
-            results = results[results["Thứ"].isin(["T2","T3","T4","T5","T6","T7"])]
+                # Lọc theo tuần
+                results = results[results["Tuần"] == int(selected_week)]
+                # Chỉ giữ T2 -> T7
+                results = results[results["Thứ"].isin(["T2", "T3", "T4", "T5", "T6", "T7"])]
 
             st.subheader(f"📌 Chi tiết tuần {selected_week} (T2 → T7)")
-            st.dataframe(
-                results[["ID", "Họ tên", "Tuần", "Thứ", 
-                         "Đi học đúng giờ", "Đồng phục",
-                         "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào", 
-                         "Tổng điểm", "Tổng điểm tuần"]]
-            )
+            st.dataframe(results)
 
-            # tính tổng điểm tuần (cộng cả T2 → T7)
-            tong_diem = results.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm"].sum()
-            tong_diem.rename(columns={"Tổng điểm": "Tổng điểm tuần"}, inplace=True)
+            # Tổng điểm tuần (theo học sinh)
+            if "Tổng điểm tuần" in results.columns:
+                tong_diem = results.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm tuần"].sum()
+                st.subheader("📊 Tổng điểm tuần")
+                st.dataframe(tong_diem)
 
-            st.subheader("📊 Tổng điểm tuần")
-            st.dataframe(tong_diem)
-
-            # AI nhận xét
             if st.button("📌 Nhận xét phụ huynh"):
                 nhan_xet = ai_nhan_xet(results)
                 if nhan_xet:
@@ -183,17 +170,13 @@ if df is not None:
 
         # Top 4 học sinh điểm cao nhất
         if {"ID", "Họ tên", "Tổng điểm tuần"}.issubset(df.columns):
-            try:
-                top4 = (
-                    df.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm tuần"]
-                    .sum()
-                    .sort_values(by="Tổng điểm tuần", ascending=False)
-                    .head(4)
-                )
-                top4["Tổng điểm tuần"] = top4["Tổng điểm tuần"].astype(int)
+            top4 = (
+                df.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm tuần"]
+                .sum()
+                .sort_values(by="Tổng điểm tuần", ascending=False)
+                .head(4)
+            )
+            top4["Tổng điểm tuần"] = top4["Tổng điểm tuần"].astype(int)
 
-                st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
-                st.dataframe(top4[["ID", "Họ tên", "Tổng điểm tuần"]])
-            except Exception as e:
-                st.error("❌ Lỗi khi xử lý dữ liệu xếp hạng")
-                st.exception(e)
+            st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
+            st.dataframe(top4[["ID", "Họ tên", "Tổng điểm tuần"]])
