@@ -29,16 +29,6 @@ def load_data():
         sheet = client.open_by_key(SHEET_ID).sheet1
         data = sheet.get_all_records()
         df = pd.DataFrame(data)
-
-        # Nếu chưa có cột "Tổng điểm" thì tự tính
-        if "Tổng điểm" not in df.columns:
-            df["Tổng điểm"] = 0
-            for col in df.columns:
-                if col not in ["ID", "Họ tên", "Tuần", "Thứ", "Tổng điểm"]:
-                    df["Tổng điểm"] += df[col].apply(
-                        lambda x: 20 if str(x).strip() == "✓" else (-30 if str(x).strip() == "X" else 0)
-                    )
-
         return sheet, df
     except Exception as e:
         st.error("❌ Lỗi tải dữ liệu Google Sheets")
@@ -46,15 +36,33 @@ def load_data():
         return None, None
 
 # ---------------------------
-# Hàm AI nhận xét học sinh
+# Quy đổi tick / X sang mô tả
+# ---------------------------
+def xu_ly_du_lieu(thong_tin):
+    df = thong_tin.copy()
+    for col in df.columns:
+        df[col] = df[col].replace({
+            "✓": "Đạt (+20 điểm)",
+            "X": "Chưa đạt (-30 điểm)",
+            "": "Không ghi nhận",
+            True: "Có (✓)",
+            False: "Không"
+        })
+    return df
+
+# ---------------------------
+# Hàm AI nhận xét
 # ---------------------------
 def ai_nhan_xet(thong_tin):
     try:
         openai.api_key = st.secrets["openai"]["api_key"]
+
+        data_quydoi = xu_ly_du_lieu(thong_tin)
+
         prompt = f"""
         Bạn là giáo viên chủ nhiệm. Đây là dữ liệu chi tiết của học sinh:
 
-        {thong_tin.to_dict(orient="records")}
+        {data_quydoi.to_dict(orient="records")}
 
         Hãy viết một nhận xét gửi phụ huynh, trong đó:
         - Nêu ưu điểm và hạn chế của học sinh.
@@ -71,21 +79,27 @@ def ai_nhan_xet(thong_tin):
             max_tokens=400
         )
         return resp.choices[0].message.content
+
     except Exception as e:
         st.error("❌ Lỗi khi gọi OpenAI API")
         st.exception(e)
         return None
 
 # ---------------------------
-# Giao diện chính
+# Chạy app
 # ---------------------------
 sheet, df = load_data()
 
 if df is not None:
-    menu = st.sidebar.radio("📌 Chọn chức năng", ["Tra cứu học sinh", "Thống kê lớp"])
+    # Ép kiểu số cho cột Tổng điểm (tránh lỗi mean)
+    if "Tổng điểm" in df.columns:
+        df["Tổng điểm"] = pd.to_numeric(df["Tổng điểm"], errors="coerce").fillna(0)
 
-    # ---- Tra cứu học sinh ----
-    if menu == "Tra cứu học sinh":
+    # Thanh chọn chức năng
+    menu = st.radio("Chọn chức năng", ["🔍 Tra cứu học sinh", "📊 Thống kê lớp"])
+
+    # ---------------- Tra cứu từng học sinh ----------------
+    if menu == "🔍 Tra cứu học sinh":
         st.subheader("🔍 Tra cứu học sinh")
         student_id = st.text_input("Nhập ID")
         student_name = st.text_input("Hoặc nhập tên")
@@ -113,26 +127,30 @@ if df is not None:
         else:
             st.info("⚠️ Không tìm thấy học sinh")
 
-    # ---- Thống kê lớp ----
-    elif menu == "Thống kê lớp":
-        st.subheader("📊 Dashboard lớp học")
+    # ---------------- Dashboard thống kê ----------------
+    elif menu == "📊 Thống kê lớp":
+        st.subheader("📊 Tổng quan lớp học")
 
-        # Điểm trung bình
         if "Tổng điểm" in df.columns:
             st.metric("Điểm trung bình cả lớp", round(df["Tổng điểm"].mean(), 2))
 
-        # Thống kê vi phạm (chỉ tính số lần bị "X")
-        cols_tc = [c for c in df.columns if c not in ["ID", "Họ tên", "Tuần", "Thứ", "Tổng điểm"]]
-        vi_pham = {}
-        for col in cols_tc:
-            vi_pham[col] = (df[col] == "X").sum()
-        vi_pham_df = pd.DataFrame(list(vi_pham.items()), columns=["Tiêu chí", "Số lần vi phạm"])
+        # Đếm số lần vi phạm theo tiêu chí
+        cols_tieuchi = ["Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
+        df_long = df.melt(id_vars=["Họ tên"], value_vars=cols_tieuchi, var_name="Tiêu chí", value_name="Kết quả")
+        df_vi_pham = df_long[df_long["Kết quả"] == "X"].groupby("Tiêu chí").size().reset_index(name="Số lần vi phạm")
 
-        st.markdown("📌 **Số lần vi phạm theo tiêu chí**")
-        fig = px.bar(vi_pham_df, x="Tiêu chí", y="Số lần vi phạm", color="Tiêu chí", text="Số lần vi phạm")
-        st.plotly_chart(fig, use_container_width=True)
+        st.subheader("📌 Số lần vi phạm theo tiêu chí")
+        if not df_vi_pham.empty:
+            fig = px.bar(df_vi_pham, x="Tiêu chí", y="Số lần vi phạm", color="Tiêu chí", text="Số lần vi phạm")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("✅ Không có vi phạm nào!")
 
         # Top 4 học sinh điểm cao nhất
-        st.markdown("🏆 **Top 4 học sinh điểm cao nhất (Tuyên dương)**")
-        top4 = df.groupby(["ID", "Họ tên"])["Tổng điểm"].sum().nlargest(4).reset_index()
-        st.table(top4)
+        st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
+
+        if "Họ tên" in df.columns and "Tổng điểm" in df.columns:
+            top4 = df.groupby("Họ tên", as_index=False)["Tổng điểm"].sum().sort_values(by="Tổng điểm", ascending=False).head(4)
+            st.table(top4)
+        else:
+            st.warning("⚠️ Thiếu cột 'Họ tên' hoặc 'Tổng điểm'")
