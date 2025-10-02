@@ -122,9 +122,9 @@ if df is not None:
         results = None
         if selected_week:
             if student_id:
-                results = df[(df["ID"].astype(str) == student_id) & (df["Tuần"].astype(str) == selected_week)]
+                results = df[(df["ID"].astype(str) == str(student_id)) & (df["Tuần"].astype(str) == str(selected_week))]
             elif student_name:
-                results = df[(df["Họ tên"].str.contains(student_name, case=False)) & (df["Tuần"].astype(str) == selected_week)]
+                results = df[(df["Họ tên"].str.contains(student_name, case=False)) & (df["Tuần"].astype(str) == str(selected_week))]
 
         if results is not None and not results.empty:
             # Sắp xếp theo thứ
@@ -135,7 +135,6 @@ if df is not None:
 
             # --------- HIỂN THỊ CHI TIẾT 6 DÒNG ----------
             st.subheader(f"📌 Chi tiết tuần {selected_week} (T2 → T7)")
-            # lấy tất cả cột có trong dữ liệu (bao gồm cả điểm môn học)
             st.dataframe(results)
 
             # --------- HIỂN THỊ TỔNG HỢP TUẦN ----------
