@@ -40,10 +40,9 @@ def load_data():
 # ---------------------------
 def tinh_tong_diem(df):
     df_out = df.copy()
-    # Khởi tạo 100 điểm ban đầu
-    df_out["Tổng điểm"] = 100
+    df_out["Tổng điểm"] = 100  # điểm gốc
 
-    # Với mỗi cột tiêu chí, cộng hoặc trừ
+    # Các tiêu chí tính điểm
     for col in ["Đi học đúng giờ", "Đồng phục", "Thái độ", "Trật tự", "Vệ sinh", "Phong trào"]:
         if col in df_out.columns:
             df_out["Tổng điểm"] += df_out[col].apply(
@@ -128,10 +127,10 @@ if df is not None:
     elif menu == "📊 Thống kê lớp":
         st.subheader("📊 Thống kê lớp học")
 
-        # Tổng điểm trung bình của cả lớp
+        # Điểm trung bình cả lớp
         st.metric("Điểm trung bình cả lớp", round(df["Tổng điểm"].mean(), 2))
 
-        # Số lần vi phạm từng tiêu chí
+        # Biểu đồ số lần vi phạm theo tiêu chí
         vi_pham = {}
         for col in ["Đi học đúng giờ", "Đồng phục", "Thái độ", "Trật tự", "Vệ sinh", "Phong trào"]:
             if col in df.columns:
@@ -147,12 +146,7 @@ if df is not None:
             )
             st.altair_chart(chart, use_container_width=True)
 
-        # Top 5 học sinh vi phạm nhiều nhất (điểm thấp nhất)
-        top_5 = df.sort_values("Tổng điểm").head(5)
-        st.write("### 🔴 Top 5 học sinh điểm thấp nhất")
-        st.table(top_5[["Họ tên", "Tổng điểm"]])
-
-        # Top 5 học sinh tốt nhất
-        top_5_tot = df.sort_values("Tổng điểm", ascending=False).head(5)
-        st.write("### 🟢 Top 5 học sinh điểm cao nhất")
-        st.table(top_5_tot[["Họ tên", "Tổng điểm"]])
+        # Top 4 học sinh điểm cao nhất
+        top_4_tot = df.sort_values("Tổng điểm", ascending=False).head(4)
+        st.write("### 🟢 Top 4 học sinh điểm cao nhất (Tuyên dương 🏆)")
+        st.table(top_4_tot[["Họ tên", "Tổng điểm"]])
