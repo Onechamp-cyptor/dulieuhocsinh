@@ -27,8 +27,10 @@ def load_data():
         client = gspread.authorize(creds)
         SHEET_ID = st.secrets["sheets"]["sheet_id"]
         sheet = client.open_by_key(SHEET_ID).sheet1
-        data = sheet.get_all_records()
-        df = pd.DataFrame(data)
+
+        # Lấy toàn bộ dữ liệu kể cả dòng trống
+        data = sheet.get_all_values()
+        df = pd.DataFrame(data[1:], columns=data[0])
 
         # Điền ID và Họ tên xuống các dòng trống (fix chỉ hiện 1 dòng T2)
         if {"ID", "Họ tên"}.issubset(df.columns):
@@ -193,3 +195,4 @@ if df is not None:
 
             st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
             st.dataframe(top4[["ID", "Họ tên", "Tổng điểm tuần"]])
+
