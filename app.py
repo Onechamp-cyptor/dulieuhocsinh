@@ -96,10 +96,9 @@ if df is not None:
     df = df.dropna(subset=["ID", "Họ tên"])
     df = df[df["Họ tên"].str.strip() != ""]
 
-    # Chuyển Tổng điểm và Tổng điểm tuần sang dạng số
-    for col in ["Tổng điểm", "Tổng điểm tuần"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+    # Chuyển Tổng điểm tuần sang dạng số
+    if "Tổng điểm tuần" in df.columns:
+        df["Tổng điểm tuần"] = pd.to_numeric(df["Tổng điểm tuần"], errors="coerce").fillna(0)
 
     # Sidebar chọn chức năng
     menu = st.sidebar.radio("📌 Chọn chức năng", ["Tra cứu học sinh", "Thống kê lớp"])
@@ -109,35 +108,32 @@ if df is not None:
         st.subheader("🔍 Tra cứu học sinh")
         student_id = st.text_input("Nhập ID")
         student_name = st.text_input("Hoặc nhập tên")
+        selected_week = st.selectbox("📅 Chọn tuần", sorted(df["Tuần"].unique()))
 
         results = None
         if student_id:
-            results = df[df["ID"].astype(str) == student_id]
+            if "ID" in df.columns:
+                results = df[(df["ID"].astype(str) == student_id) & (df["Tuần"] == selected_week)]
+            else:
+                st.warning("⚠️ Google Sheets chưa có cột 'ID'")
         elif student_name:
-            results = df[df["Họ tên"].str.contains(student_name, case=False, na=False)]
+            if "Họ tên" in df.columns:
+                results = df[(df["Họ tên"].str.contains(student_name, case=False)) & (df["Tuần"] == selected_week)]
+            else:
+                st.warning("⚠️ Google Sheets chưa có cột 'Họ tên'")
 
         if results is not None and not results.empty:
-            # Chọn tuần cần xem
-            if "Tuần" in results.columns:
-                week_list = sorted(results["Tuần"].unique())
-                selected_week = st.selectbox("📅 Chọn tuần", week_list)
+            st.subheader(f"📌 Chi tiết tuần {selected_week} (T2 → CN)")
+            st.dataframe(results)  # 👉 Hiện đủ T2 đến T7
 
-                # Lọc dữ liệu theo tuần (T2 → T7)
-                week_data = results[results["Tuần"] == selected_week]
+            # Tính tổng điểm tuần
+            if "Tổng điểm" in results.columns:
+                tong_tuan = results.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm"].sum()
+                tong_tuan.rename(columns={"Tổng điểm": "Tổng điểm tuần"}, inplace=True)
 
-                # Hiển thị chi tiết cả tuần
-                st.write(f"📌 Chi tiết tuần {selected_week} (T2 → CN)")
-                st.dataframe(week_data)
+                st.subheader("📊 Tổng điểm tuần")
+                st.dataframe(tong_tuan)
 
-                # Tính tổng điểm tuần
-                if "Tổng điểm" in week_data.columns:
-                    tong_tuan = week_data.groupby(["ID", "Họ tên"])["Tổng điểm"].sum().reset_index()
-                    tong_tuan.rename(columns={"Tổng điểm": "Tổng điểm tuần"}, inplace=True)
-
-                    st.subheader("📊 Tổng điểm tuần")
-                    st.dataframe(tong_tuan)
-
-            # Nhận xét phụ huynh
             if st.button("📌 Nhận xét phụ huynh"):
                 nhan_xet = ai_nhan_xet(results)
                 if nhan_xet:
@@ -179,6 +175,8 @@ if df is not None:
                     .sort_values(by="Tổng điểm tuần", ascending=False)
                     .head(4)
                 )
+                top4["Tổng điểm tuần"] = top4["Tổng điểm tuần"].astype(int)
+
                 st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
                 st.dataframe(top4[["ID", "Họ tên", "Tổng điểm tuần"]])
             except Exception as e:
