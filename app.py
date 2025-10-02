@@ -36,19 +36,20 @@ def load_data():
         return None, None
 
 # ---------------------------
-# Quy đổi dữ liệu tick / X
+# Tính tổng điểm cho học sinh
 # ---------------------------
-def xu_ly_du_lieu(thong_tin):
-    df = thong_tin.copy()
-    for col in df.columns:
-        df[col] = df[col].replace({
-            "✓": "Đạt (+20 điểm)",
-            "X": "Chưa đạt (-30 điểm)",
-            "": "Không ghi nhận",
-            True: "Có (✓)",
-            False: "Không"
-        })
-    return df
+def tinh_tong_diem(df):
+    df_out = df.copy()
+    # Khởi tạo 100 điểm ban đầu
+    df_out["Tổng điểm"] = 100
+
+    # Với mỗi cột tiêu chí, cộng hoặc trừ
+    for col in ["Đi học đúng giờ", "Đồng phục", "Thái độ", "Trật tự", "Vệ sinh", "Phong trào"]:
+        if col in df_out.columns:
+            df_out["Tổng điểm"] += df_out[col].apply(
+                lambda x: 20 if str(x).strip() == "✓" else (-30 if str(x).strip().upper() == "X" else 0)
+            )
+    return df_out
 
 # ---------------------------
 # Hàm AI nhận xét học sinh
@@ -57,15 +58,12 @@ def ai_nhan_xet(thong_tin):
     try:
         openai.api_key = st.secrets["openai"]["api_key"]
 
-        # Quy đổi dữ liệu để AI đọc dễ hơn
-        data_quydoi = xu_ly_du_lieu(thong_tin)
-
         prompt = f"""
         Bạn là giáo viên chủ nhiệm. Đây là dữ liệu chi tiết của học sinh:
 
-        {data_quydoi.to_dict(orient="records")}
+        {thong_tin.to_dict(orient="records")}
 
-        Hãy viết một nhận xét gửi phụ huynh, trong đó:
+        Hãy viết nhận xét gửi phụ huynh, trong đó:
         - Nêu ưu điểm và hạn chế của học sinh.
         - Nhận xét về học tập, thái độ, kỷ luật, vệ sinh, tham gia phong trào...
         - Đưa ra lời khuyên cụ thể để giúp học sinh tiến bộ hơn.
@@ -92,6 +90,9 @@ def ai_nhan_xet(thong_tin):
 sheet, df = load_data()
 
 if df is not None:
+    # Tính tổng điểm cho từng học sinh
+    df = tinh_tong_diem(df)
+
     menu = st.sidebar.radio("📌 Chọn chức năng", ["🔍 Tra cứu học sinh", "📊 Thống kê lớp"])
 
     # ---------------- Tra cứu học sinh ----------------
@@ -128,8 +129,7 @@ if df is not None:
         st.subheader("📊 Thống kê lớp học")
 
         # Tổng điểm trung bình của cả lớp
-        if "Tổng điểm" in df.columns:
-            st.metric("Điểm trung bình cả lớp", round(df["Tổng điểm"].mean(), 2))
+        st.metric("Điểm trung bình cả lớp", round(df["Tổng điểm"].mean(), 2))
 
         # Số lần vi phạm từng tiêu chí
         vi_pham = {}
@@ -148,11 +148,11 @@ if df is not None:
             st.altair_chart(chart, use_container_width=True)
 
         # Top 5 học sinh vi phạm nhiều nhất (điểm thấp nhất)
-        if "Tổng điểm" in df.columns:
-            top_5 = df.sort_values("Tổng điểm").head(5)
-            st.write("### 🔴 Top 5 học sinh điểm thấp nhất")
-            st.table(top_5[["Họ tên", "Tổng điểm"]])
+        top_5 = df.sort_values("Tổng điểm").head(5)
+        st.write("### 🔴 Top 5 học sinh điểm thấp nhất")
+        st.table(top_5[["Họ tên", "Tổng điểm"]])
 
-            top_5_tot = df.sort_values("Tổng điểm", ascending=False).head(5)
-            st.write("### 🟢 Top 5 học sinh điểm cao nhất")
-            st.table(top_5_tot[["Họ tên", "Tổng điểm"]])
+        # Top 5 học sinh tốt nhất
+        top_5_tot = df.sort_values("Tổng điểm", ascending=False).head(5)
+        st.write("### 🟢 Top 5 học sinh điểm cao nhất")
+        st.table(top_5_tot[["Họ tên", "Tổng điểm"]])
