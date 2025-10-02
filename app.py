@@ -35,20 +35,38 @@ def load_data():
         return None, None
 
 # ---------------------------
+# Quy đổi dữ liệu tick / X
+# ---------------------------
+def xu_ly_du_lieu(thong_tin):
+    df = thong_tin.copy()
+    for col in df.columns:
+        df[col] = df[col].replace({
+            "✓": "Đạt (+20 điểm)",
+            "X": "Chưa đạt (-30 điểm)",
+            "": "Không ghi nhận",
+            True: "Có (✓)",
+            False: "Không"
+        })
+    return df
+
+# ---------------------------
 # Hàm AI nhận xét học sinh
 # ---------------------------
 def ai_nhan_xet(thong_tin):
     try:
         openai.api_key = st.secrets["openai"]["api_key"]
 
+        # Quy đổi dữ liệu để AI đọc dễ hơn
+        data_quydoi = xu_ly_du_lieu(thong_tin)
+
         prompt = f"""
         Bạn là giáo viên chủ nhiệm. Đây là dữ liệu chi tiết của học sinh:
 
-        {thong_tin.to_dict(orient="records")}
+        {data_quydoi.to_dict(orient="records")}
 
-        Hãy viết nhận xét gửi phụ huynh, trong đó:
-        - Phân tích kết quả học tập (ưu điểm và hạn chế).
-        - Nhận xét mức độ tham gia phong trào, vệ sinh lớp, phát biểu xây dựng bài... (dựa vào các cột có dấu tick ✓ hoặc TRUE/FALSE).
+        Hãy viết một nhận xét gửi phụ huynh, trong đó:
+        - Nêu ưu điểm và hạn chế của học sinh.
+        - Nhận xét về học tập, thái độ, kỷ luật, vệ sinh, tham gia phong trào...
         - Đưa ra lời khuyên cụ thể để giúp học sinh tiến bộ hơn.
         """
 
@@ -91,9 +109,11 @@ if df is not None:
 
     if results is not None and not results.empty:
         st.dataframe(results)
+
         if st.button("📌 Nhận xét phụ huynh"):
             nhan_xet = ai_nhan_xet(results)
             if nhan_xet:
+                st.success("✅ Nhận xét đã tạo:")
                 st.write(nhan_xet)
     else:
         st.info("⚠️ Không tìm thấy học sinh")
