@@ -127,7 +127,7 @@ if df is not None:
                 weeks = sorted(pd.to_numeric(results["Tuần"], errors="coerce").dropna().unique())
                 selected_week = st.selectbox("📅 Chọn tuần", weeks)
 
-                # Hiện đầy đủ T2 -> T7
+                # Lọc đủ dữ liệu T2 → T7
                 week_data = results[results["Tuần"] == selected_week]
 
                 if not week_data.empty:
@@ -140,12 +140,13 @@ if df is not None:
                         st.markdown("### 📊 Tổng điểm tuần")
                         st.dataframe(tong)
 
-            # Nút tạo nhận xét phụ huynh
+            # Nút nhận xét phụ huynh
             if st.button("📌 Nhận xét phụ huynh"):
                 nhan_xet = ai_nhan_xet(results)
                 if nhan_xet:
                     st.success("✅ Nhận xét đã tạo:")
                     st.write(nhan_xet)
+
         else:
             st.info("⚠️ Không tìm thấy học sinh")
 
@@ -189,3 +190,4 @@ if df is not None:
             except Exception as e:
                 st.error("❌ Lỗi khi xử lý dữ liệu xếp hạng")
                 st.exception(e)
+
