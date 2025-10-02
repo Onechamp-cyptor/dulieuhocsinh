@@ -3,6 +3,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 import openai
+import altair as alt
 
 # ---------------------------
 # Cấu hình Streamlit
@@ -91,29 +92,67 @@ def ai_nhan_xet(thong_tin):
 sheet, df = load_data()
 
 if df is not None:
-    st.subheader("🔍 Tra cứu học sinh")
-    student_id = st.text_input("Nhập ID")
-    student_name = st.text_input("Hoặc nhập tên")
+    menu = st.sidebar.radio("📌 Chọn chức năng", ["🔍 Tra cứu học sinh", "📊 Thống kê lớp"])
 
-    results = None
-    if student_id:
-        if "ID" in df.columns:
-            results = df[df["ID"].astype(str) == student_id]
+    # ---------------- Tra cứu học sinh ----------------
+    if menu == "🔍 Tra cứu học sinh":
+        st.subheader("🔍 Tra cứu học sinh")
+        student_id = st.text_input("Nhập ID")
+        student_name = st.text_input("Hoặc nhập tên")
+
+        results = None
+        if student_id:
+            if "ID" in df.columns:
+                results = df[df["ID"].astype(str) == student_id]
+            else:
+                st.warning("⚠️ Google Sheets chưa có cột 'ID'")
+        elif student_name:
+            if "Họ tên" in df.columns:
+                results = df[df["Họ tên"].str.contains(student_name, case=False)]
+            else:
+                st.warning("⚠️ Google Sheets chưa có cột 'Họ tên'")
+
+        if results is not None and not results.empty:
+            st.dataframe(results)
+
+            if st.button("📌 Nhận xét phụ huynh"):
+                nhan_xet = ai_nhan_xet(results)
+                if nhan_xet:
+                    st.success("✅ Nhận xét đã tạo:")
+                    st.write(nhan_xet)
         else:
-            st.warning("⚠️ Google Sheets chưa có cột 'ID'")
-    elif student_name:
-        if "Họ tên" in df.columns:
-            results = df[df["Họ tên"].str.contains(student_name, case=False)]
-        else:
-            st.warning("⚠️ Google Sheets chưa có cột 'Họ tên'")
+            st.info("⚠️ Không tìm thấy học sinh")
 
-    if results is not None and not results.empty:
-        st.dataframe(results)
+    # ---------------- Thống kê lớp ----------------
+    elif menu == "📊 Thống kê lớp":
+        st.subheader("📊 Thống kê lớp học")
 
-        if st.button("📌 Nhận xét phụ huynh"):
-            nhan_xet = ai_nhan_xet(results)
-            if nhan_xet:
-                st.success("✅ Nhận xét đã tạo:")
-                st.write(nhan_xet)
-    else:
-        st.info("⚠️ Không tìm thấy học sinh")
+        # Tổng điểm trung bình của cả lớp
+        if "Tổng điểm" in df.columns:
+            st.metric("Điểm trung bình cả lớp", round(df["Tổng điểm"].mean(), 2))
+
+        # Số lần vi phạm từng tiêu chí
+        vi_pham = {}
+        for col in ["Đi học đúng giờ", "Đồng phục", "Thái độ", "Trật tự", "Vệ sinh", "Phong trào"]:
+            if col in df.columns:
+                vi_pham[col] = (df[col] == "X").sum()
+
+        if vi_pham:
+            vi_pham_df = pd.DataFrame(list(vi_pham.items()), columns=["Tiêu chí", "Số lần vi phạm"])
+            st.write("### 📌 Số lần vi phạm theo tiêu chí")
+            chart = alt.Chart(vi_pham_df).mark_bar().encode(
+                x="Tiêu chí",
+                y="Số lần vi phạm",
+                color="Tiêu chí"
+            )
+            st.altair_chart(chart, use_container_width=True)
+
+        # Top 5 học sinh vi phạm nhiều nhất (điểm thấp nhất)
+        if "Tổng điểm" in df.columns:
+            top_5 = df.sort_values("Tổng điểm").head(5)
+            st.write("### 🔴 Top 5 học sinh điểm thấp nhất")
+            st.table(top_5[["Họ tên", "Tổng điểm"]])
+
+            top_5_tot = df.sort_values("Tổng điểm", ascending=False).head(5)
+            st.write("### 🟢 Top 5 học sinh điểm cao nhất")
+            st.table(top_5_tot[["Họ tên", "Tổng điểm"]])
