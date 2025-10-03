@@ -9,6 +9,59 @@ import plotly.express as px
 # Cấu hình Streamlit
 # ---------------------------
 st.set_page_config(page_title="Quản lý điểm học sinh", page_icon="📘", layout="wide")
+
+# ---------------------------
+# CSS style Google-like
+# ---------------------------
+st.markdown("""
+    <style>
+    /* Nền chính */
+    .main {
+        background-color: #f9f9f9;
+    }
+
+    /* Tiêu đề */
+    h1, h2, h3 {
+        color: #4285F4; /* xanh Google */
+        font-weight: bold;
+    }
+
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #f1f3f4;
+    }
+
+    /* Nút bấm */
+    .stButton>button {
+        background-color: #34A853; /* xanh lá Google */
+        color: white;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: bold;
+        border: none;
+        padding: 8px 20px;
+    }
+    .stButton>button:hover {
+        background-color: #0F9D58; /* xanh đậm hơn khi hover */
+    }
+
+    /* Ô nhập */
+    .stTextInput>div>div>input {
+        border: 1px solid #dadce0;
+        border-radius: 8px;
+        padding: 6px 12px;
+    }
+
+    /* Bảng */
+    .stDataFrame {
+        border-radius: 10px;
+        border: 1px solid #dadce0;
+        padding: 10px;
+        background-color: white;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("📘 Quản lý điểm học sinh (Google Sheets + AI)")
 
 # ---------------------------
@@ -123,16 +176,13 @@ if df is not None:
                 ten_hs = results["Họ tên"].iloc[0]
                 st.subheader(f"📌 Kết quả học tập của {ten_hs} (ID: {student_id})")
 
-                # Hiển thị toàn bộ dữ liệu của học sinh
                 st.dataframe(results)
 
-                # Gom nhóm theo tuần để xem tổng điểm
                 if {"Tuần", "Tổng điểm tuần"}.issubset(results.columns):
                     tong_tuan = results.groupby("Tuần", as_index=False)["Tổng điểm tuần"].sum()
                     st.subheader("📊 Tổng điểm theo từng tuần")
                     st.dataframe(tong_tuan)
 
-                # Nhận xét AI
                 if st.button("📌 Nhận xét phụ huynh"):
                     nhan_xet = ai_nhan_xet(results)
                     if nhan_xet:
