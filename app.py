@@ -16,7 +16,7 @@ st.set_page_config(page_title="Quản lý điểm học sinh", page_icon="📘",
 st.markdown("""
     <style>
     /* Nền chính */
-    .main {
+    div[data-testid="stAppViewContainer"] {
         background-color: #f9f9f9;
     }
 
@@ -32,7 +32,7 @@ st.markdown("""
     }
 
     /* Nút bấm */
-    .stButton>button {
+    div.stButton > button:first-child {
         background-color: #34A853; /* xanh lá Google */
         color: white;
         border-radius: 10px;
@@ -41,19 +41,20 @@ st.markdown("""
         border: none;
         padding: 8px 20px;
     }
-    .stButton>button:hover {
-        background-color: #0F9D58; /* xanh đậm hơn khi hover */
+    div.stButton > button:hover {
+        background-color: #0F9D58;
+        color: white;
     }
 
     /* Ô nhập */
-    .stTextInput>div>div>input {
+    div[data-baseweb="input"] > input {
         border: 1px solid #dadce0;
         border-radius: 8px;
         padding: 6px 12px;
     }
 
     /* Bảng */
-    .stDataFrame {
+    div[data-testid="stDataFrame"] {
         border-radius: 10px;
         border: 1px solid #dadce0;
         padding: 10px;
@@ -87,7 +88,7 @@ def load_data():
         # Thay "" thành None để ffill hoạt động
         df = df.replace("", None)
 
-        # Điền ID và Họ tên xuống các dòng trống
+        # Điền ID và Họ tên xuống các dòng trống (để T2→T7 đủ)
         if {"ID", "Họ tên"}.issubset(df.columns):
             df[["ID", "Họ tên"]] = df[["ID", "Họ tên"]].ffill()
 
@@ -176,13 +177,16 @@ if df is not None:
                 ten_hs = results["Họ tên"].iloc[0]
                 st.subheader(f"📌 Kết quả học tập của {ten_hs} (ID: {student_id})")
 
+                # Hiển thị toàn bộ tuần (T2 → T7)
                 st.dataframe(results)
 
+                # Gom nhóm theo tuần để xem tổng điểm
                 if {"Tuần", "Tổng điểm tuần"}.issubset(results.columns):
                     tong_tuan = results.groupby("Tuần", as_index=False)["Tổng điểm tuần"].sum()
                     st.subheader("📊 Tổng điểm theo từng tuần")
                     st.dataframe(tong_tuan)
 
+                # Nhận xét AI
                 if st.button("📌 Nhận xét phụ huynh"):
                     nhan_xet = ai_nhan_xet(results)
                     if nhan_xet:
@@ -224,4 +228,3 @@ if df is not None:
 
             st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
             st.dataframe(top4[["ID", "Họ tên", "Tổng điểm tuần"]])
-
