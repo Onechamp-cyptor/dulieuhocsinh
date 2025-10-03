@@ -28,7 +28,6 @@ def load_data():
         SHEET_ID = st.secrets["sheets"]["sheet_id"]
         sheet = client.open_by_key(SHEET_ID).sheet1
 
-        # Lấy toàn bộ dữ liệu (kể cả dòng trống do merge)
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
 
@@ -102,67 +101,45 @@ def ai_nhan_xet(thong_tin):
 sheet, df = load_data()
 
 if df is not None:
-    # Chuyển ID sang string
     if "ID" in df.columns:
         df["ID"] = df["ID"].astype(str)
 
-    # Chuyển điểm về số
     if "Tổng điểm" in df.columns:
         df["Tổng điểm"] = pd.to_numeric(df["Tổng điểm"], errors="coerce").fillna(0)
     if "Tổng điểm tuần" in df.columns:
         df["Tổng điểm tuần"] = pd.to_numeric(df["Tổng điểm tuần"], errors="coerce").fillna(0)
 
-    # Sidebar chọn chức năng
     menu = st.sidebar.radio("📌 Chọn chức năng", ["Tra cứu học sinh", "Thống kê lớp"])
 
     # ------------------ TRA CỨU ------------------
     if menu == "Tra cứu học sinh":
         st.subheader("🔍 Tra cứu học sinh")
         student_id = st.text_input("Nhập ID")
-        student_name = st.text_input("Hoặc nhập tên")
 
-        # Lấy danh sách tuần hợp lệ
-        if "Tuần" in df.columns:
-            week_list = sorted([str(w) for w in df["Tuần"].dropna().unique()])
-            selected_week = st.selectbox("📅 Chọn tuần", week_list)
-        else:
-            st.error("❌ Thiếu cột 'Tuần' trong Google Sheet")
-            selected_week = None
+        if student_id:
+            results = df[df["ID"] == str(student_id)]
 
-        results = None
-        if selected_week:
-            if student_id:
-                results = df[(df["ID"] == str(student_id)) & (df["Tuần"].astype(str) == str(selected_week))]
-            elif student_name:
-                results = df[(df["Họ tên"].str.contains(student_name, case=False)) & (df["Tuần"].astype(str) == str(selected_week))]
+            if not results.empty:
+                ten_hs = results["Họ tên"].iloc[0]
+                st.subheader(f"📌 Kết quả học tập của {ten_hs} (ID: {student_id})")
 
-        if results is not None and not results.empty:
-            # Sắp xếp theo Thứ
-            if "Thứ" in results.columns:
-                thu_order = ["T2", "T3", "T4", "T5", "T6", "T7"]
-                results["Thứ"] = pd.Categorical(results["Thứ"], categories=thu_order, ordered=True)
-                results = results.sort_values("Thứ")
+                # Hiển thị toàn bộ dữ liệu của học sinh
+                st.dataframe(results)
 
-            # --------- HIỂN THỊ CHI TIẾT 6 DÒNG ----------
-            st.subheader(f"📌 Chi tiết tuần {selected_week} (T2 → T7)")
-            st.dataframe(results)
+                # Gom nhóm theo tuần để xem tổng điểm
+                if {"Tuần", "Tổng điểm tuần"}.issubset(results.columns):
+                    tong_tuan = results.groupby("Tuần", as_index=False)["Tổng điểm tuần"].sum()
+                    st.subheader("📊 Tổng điểm theo từng tuần")
+                    st.dataframe(tong_tuan)
 
-            # --------- HIỂN THỊ TỔNG HỢP TUẦN ----------
-            if "Tổng điểm" in results.columns:
-                tong_tuan = results.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm"].sum()
-                tong_tuan.rename(columns={"Tổng điểm": "Tổng điểm tuần"}, inplace=True)
-
-                st.subheader("📊 Tổng điểm tuần (T2 → T7)")
-                st.dataframe(tong_tuan)
-
-            # --------- NHẬN XÉT AI ----------
-            if st.button("📌 Nhận xét phụ huynh"):
-                nhan_xet = ai_nhan_xet(results)
-                if nhan_xet:
-                    st.success("✅ Nhận xét đã tạo:")
-                    st.write(nhan_xet)
-        else:
-            st.info("⚠️ Không tìm thấy học sinh")
+                # Nhận xét AI
+                if st.button("📌 Nhận xét phụ huynh"):
+                    nhan_xet = ai_nhan_xet(results)
+                    if nhan_xet:
+                        st.success("✅ Nhận xét đã tạo:")
+                        st.write(nhan_xet)
+            else:
+                st.info("⚠️ Không tìm thấy học sinh")
 
     # ------------------ THỐNG KÊ ------------------
     elif menu == "Thống kê lớp":
@@ -171,7 +148,6 @@ if df is not None:
         if "Tổng điểm tuần" in df.columns:
             st.metric("Điểm trung bình cả lớp", round(df["Tổng điểm tuần"].mean(), 2))
 
-        # Số lần vi phạm
         cols_check = ["Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
         vi_pham = {}
         for col in cols_check:
@@ -187,7 +163,6 @@ if df is not None:
             )
             st.plotly_chart(fig)
 
-        # Top 4 học sinh
         if {"ID", "Họ tên", "Tổng điểm tuần"}.issubset(df.columns):
             top4 = (
                 df.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm tuần"]
