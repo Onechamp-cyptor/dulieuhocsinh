@@ -15,7 +15,7 @@ st.set_page_config(page_title="Quản lý điểm học sinh", page_icon="📘",
 # ---------------------------
 st.markdown("""
     <style>
-    /* Nền chính */
+    /* Toàn bộ nền */
     div[data-testid="stAppViewContainer"] {
         background-color: #f9f9f9;
     }
@@ -42,7 +42,7 @@ st.markdown("""
         padding: 8px 20px;
     }
     div.stButton > button:hover {
-        background-color: #0F9D58;
+        background-color: #0F9D58; /* xanh đậm hơn khi hover */
         color: white;
     }
 
