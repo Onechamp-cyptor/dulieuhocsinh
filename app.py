@@ -7,6 +7,7 @@ import plotly.express as px
 from fpdf import FPDF
 import tempfile
 import base64
+import os
 
 # ---------------------------
 # ⚙️ Cấu hình Streamlit
@@ -120,15 +121,22 @@ def ai_nhan_xet(thong_tin):
         return None
 
 # ---------------------------
-# 🧾 Hàm xuất PDF nhận xét
+# 🧾 Hàm xuất PDF tiếng Việt (dùng fpdf2)
 # ---------------------------
 def export_pdf(ten_hs, nhan_xet):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", size=14)
-    pdf.cell(200, 10, txt="NHẬN XÉT HỌC SINH", ln=True, align="C")
+
+    # 📝 Dùng font Unicode (DejaVuSans)
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    if not os.path.exists(font_path):
+        st.warning("⚠️ Không tìm thấy font DejaVuSans, vui lòng cài font Unicode vào server nếu cần.")
+    pdf.add_font("DejaVu", "", font_path, uni=True)
+    pdf.set_font("DejaVu", "", 14)
+
+    pdf.cell(0, 10, "NHẬN XÉT HỌC SINH", ln=True, align="C")
     pdf.ln(10)
-    pdf.set_font("Arial", size=12)
+    pdf.set_font("DejaVu", "", 12)
     pdf.multi_cell(0, 8, f"Họ và tên: {ten_hs}\n\nNhận xét:\n{nhan_xet}")
 
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
@@ -165,7 +173,7 @@ if df is not None:
 
                 # Biểu đồ tiến bộ
                 if "Tháng" in df.columns and "Tổng điểm" in df.columns:
-                    df_student = df[df["ID"] == str(student_id)]
+                    df_student = df[df["ID"] == str(student_id)].copy()
                     df_student["Tổng điểm"] = pd.to_numeric(df_student["Tổng điểm"], errors="coerce").fillna(0)
                     fig = px.line(
                         df_student,
@@ -232,4 +240,5 @@ if df is not None:
         # Top 4
         st.subheader("🏆 Top 4 học sinh có tổng điểm cao nhất")
         st.dataframe(df_grouped.head(4), hide_index=True)
+
 
