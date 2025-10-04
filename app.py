@@ -169,9 +169,38 @@ if df is not None:
     elif menu == "Thống kê lớp":
         st.subheader("📊 Thống kê lớp")
 
+        # ✅ Trung bình rèn luyện
         if "Tổng điểm rèn luyện" in df.columns:
-            st.metric("Điểm rèn luyện trung bình cả lớp", round(df["Tổng điểm rèn luyện"].mean(), 2))
+            st.metric("Điểm rèn luyện trung bình cả lớp", round(df["Tổng điểm rèn luyện"].astype(float).mean(), 2))
 
+        # ✅ Thống kê toàn bộ học sinh
+        if {"ID", "Họ tên", "Tổng điểm rèn luyện"}.issubset(df.columns):
+            tong_hs = (
+                df.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm rèn luyện"]
+                .sum()
+                .sort_values(by="Tổng điểm rèn luyện", ascending=False)
+            )
+
+            tong_hs["Tổng điểm rèn luyện"] = tong_hs["Tổng điểm rèn luyện"].astype(float)
+            tong_hs["Xếp loại"] = tong_hs["Tổng điểm rèn luyện"].apply(
+                lambda x: "Tốt" if x >= 500 else ("Khá" if x >= 400 else "Trung bình")
+            )
+
+            st.subheader("📋 Thống kê toàn bộ học sinh")
+            st.dataframe(tong_hs)
+
+            # Biểu đồ top học sinh
+            fig_top = px.bar(
+                tong_hs.head(10),
+                x="Họ tên",
+                y="Tổng điểm rèn luyện",
+                color="Xếp loại",
+                text="Tổng điểm rèn luyện",
+                title="🏆 Top học sinh có điểm rèn luyện cao nhất"
+            )
+            st.plotly_chart(fig_top)
+
+        # ✅ Biểu đồ thống kê vi phạm
         cols_check = ["Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
         vi_pham = {}
         for col in cols_check:
@@ -179,26 +208,14 @@ if df is not None:
                 vi_pham[col] = (df[col] == "X").sum()
 
         if vi_pham:
-            fig = px.bar(
+            st.subheader("📉 Thống kê vi phạm theo tiêu chí")
+            fig_vp = px.bar(
                 x=list(vi_pham.keys()),
                 y=list(vi_pham.values()),
                 labels={"x": "Tiêu chí", "y": "Số lần vi phạm"},
-                title="📌 Số lần vi phạm theo tiêu chí"
+                title="📌 Số lần vi phạm trong toàn lớp"
             )
-            st.plotly_chart(fig)
-
-        # ✅ Top học sinh có điểm rèn luyện cao nhất
-        if {"ID", "Họ tên", "Tổng điểm rèn luyện"}.issubset(df.columns):
-            top4 = (
-                df.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm rèn luyện"]
-                .sum()
-                .sort_values(by="Tổng điểm rèn luyện", ascending=False)
-                .head(4)
-            )
-            top4["Tổng điểm rèn luyện"] = top4["Tổng điểm rèn luyện"].astype(int)
-
-            st.subheader("🏆 Top 4 học sinh có điểm rèn luyện cao nhất (Tuyên dương)")
-            st.dataframe(top4[["ID", "Họ tên", "Tổng điểm rèn luyện"]])
+            st.plotly_chart(fig_vp)
 
 
 
