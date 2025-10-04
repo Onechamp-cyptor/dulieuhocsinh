@@ -115,6 +115,31 @@ def xu_ly_du_lieu(thong_tin):
     return df
 
 # ---------------------------
+# Hàm phân loại điểm môn học
+# ---------------------------
+def danh_gia_mon_hoc(df):
+    ket_qua = {}
+    mon_hoc = ["Toán", "Ngữ Văn", "Tiếng Anh", "KHTN", "Lịch sử&Địa lí", 
+               "Tin học", "Công nghệ", "Nghệ thuật", "GDCD", "GDTC", 
+               "HĐTN HN", "GDĐP"]
+
+    for mon in mon_hoc:
+        if mon in df.columns:
+            try:
+                diem = pd.to_numeric(df[mon], errors="coerce").mean()
+                if pd.isna(diem):
+                    ket_qua[mon] = "Chưa có dữ liệu"
+                elif diem >= 8:
+                    ket_qua[mon] = f"{diem:.1f} điểm → Học giỏi"
+                elif diem >= 6:
+                    ket_qua[mon] = f"{diem:.1f} điểm → Cần cố gắng thêm"
+                else:
+                    ket_qua[mon] = f"{diem:.1f} điểm → Cần nỗ lực nhiều"
+            except:
+                ket_qua[mon] = "Lỗi dữ liệu"
+    return ket_qua
+
+# ---------------------------
 # Hàm AI nhận xét học sinh
 # ---------------------------
 def ai_nhan_xet(thong_tin):
@@ -123,14 +148,20 @@ def ai_nhan_xet(thong_tin):
 
         data_quydoi = xu_ly_du_lieu(thong_tin)
 
+        # Thêm đánh giá môn học
+        danh_gia = danh_gia_mon_hoc(thong_tin)
+
         prompt = f"""
         Bạn là giáo viên chủ nhiệm. Đây là dữ liệu chi tiết của học sinh:
 
         {data_quydoi.to_dict(orient="records")}
 
+        Kết quả học tập theo từng môn (đã phân loại):
+        {danh_gia}
+
         Hãy viết một nhận xét gửi phụ huynh, trong đó:
         - Nêu ưu điểm và hạn chế của học sinh.
-        - Nhận xét về học tập, thái độ, kỷ luật, vệ sinh, tham gia phong trào...
+        - Nhận xét về học tập (dựa vào phân loại môn học trên), thái độ, kỷ luật, vệ sinh, tham gia phong trào...
         - Đưa ra lời khuyên cụ thể để giúp học sinh tiến bộ hơn.
         """
 
