@@ -184,7 +184,7 @@ if df is not None:
 
         # ✅ Thống kê vi phạm
         st.subheader("📈 Thống kê vi phạm theo tiêu chí")
-        cols_check = ["Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
+        cols_check = ["Điển danh", "Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
         vi_pham = {col: (df[col] == "X").sum() for col in cols_check if col in df.columns}
 
         if vi_pham:
