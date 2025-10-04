@@ -15,25 +15,18 @@ st.set_page_config(page_title="Quản lý điểm học sinh", page_icon="📘",
 # ---------------------------
 st.markdown("""
     <style>
-    /* Toàn bộ nền */
     div[data-testid="stAppViewContainer"] {
         background-color: #f9f9f9;
     }
-
-    /* Tiêu đề */
     h1, h2, h3 {
-        color: #4285F4; /* xanh Google */
+        color: #4285F4;
         font-weight: bold;
     }
-
-    /* Sidebar */
     section[data-testid="stSidebar"] {
         background-color: #f1f3f4;
     }
-
-    /* Nút bấm */
     div.stButton > button:first-child {
-        background-color: #34A853; /* xanh lá Google */
+        background-color: #34A853;
         color: white;
         border-radius: 10px;
         font-size: 16px;
@@ -42,18 +35,14 @@ st.markdown("""
         padding: 8px 20px;
     }
     div.stButton > button:hover {
-        background-color: #0F9D58; /* xanh đậm hơn khi hover */
+        background-color: #0F9D58;
         color: white;
     }
-
-    /* Ô nhập */
     div[data-baseweb="input"] > input {
         border: 1px solid #dadce0;
         border-radius: 8px;
         padding: 6px 12px;
     }
-
-    /* Bảng */
     div[data-testid="stDataFrame"] {
         border-radius: 10px;
         border: 1px solid #dadce0;
@@ -85,10 +74,8 @@ def load_data():
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
 
-        # Thay "" thành None để ffill hoạt động
         df = df.replace("", None)
 
-        # Điền ID và Họ tên xuống các dòng trống (để T2→T7 đủ)
         if {"ID", "Họ tên"}.issubset(df.columns):
             df[["ID", "Họ tên"]] = df[["ID", "Họ tên"]].ffill()
 
@@ -115,12 +102,12 @@ def xu_ly_du_lieu(thong_tin):
     return df
 
 # ---------------------------
-# Hàm phân loại điểm môn học
+# Hàm phân tích điểm môn học (cho AI dùng)
 # ---------------------------
-def danh_gia_mon_hoc(df):
+def phan_tich_mon_hoc(df):
     ket_qua = {}
-    mon_hoc = ["Toán", "Ngữ Văn", "Tiếng Anh", "KHTN", "Lịch sử&Địa lí", 
-               "Tin học", "Công nghệ", "Nghệ thuật", "GDCD", "GDTC", 
+    mon_hoc = ["Toán", "Ngữ Văn", "Tiếng Anh", "KHTN", "Lịch sử&Địa lí",
+               "Tin học", "Công nghệ", "Nghệ thuật", "GDCD", "GDTC",
                "HĐTN HN", "GDĐP"]
 
     for mon in mon_hoc:
@@ -128,15 +115,15 @@ def danh_gia_mon_hoc(df):
             try:
                 diem = pd.to_numeric(df[mon], errors="coerce").mean()
                 if pd.isna(diem):
-                    ket_qua[mon] = "Chưa có dữ liệu"
+                    continue
                 elif diem >= 8:
-                    ket_qua[mon] = f"{diem:.1f} điểm → Học giỏi"
+                    ket_qua[mon] = f"{diem:.1f} điểm → Học tập tốt"
                 elif diem >= 6:
-                    ket_qua[mon] = f"{diem:.1f} điểm → Cần cố gắng thêm"
+                    ket_qua[mon] = f"{diem:.1f} điểm → Có sự nỗ lực trong học tập"
                 else:
-                    ket_qua[mon] = f"{diem:.1f} điểm → Cần nỗ lực nhiều"
+                    ket_qua[mon] = f"{diem:.1f} điểm → Cần cố gắng thêm"
             except:
-                ket_qua[mon] = "Lỗi dữ liệu"
+                continue
     return ket_qua
 
 # ---------------------------
@@ -148,22 +135,27 @@ def ai_nhan_xet(thong_tin):
 
         data_quydoi = xu_ly_du_lieu(thong_tin)
 
-        # Thêm đánh giá môn học
-        danh_gia = danh_gia_mon_hoc(thong_tin)
+        danh_gia = phan_tich_mon_hoc(thong_tin)
 
         prompt = f"""
         Bạn là giáo viên chủ nhiệm. Đây là dữ liệu chi tiết của học sinh:
 
         {data_quydoi.to_dict(orient="records")}
 
-        Kết quả học tập theo từng môn (đã phân loại):
+        Phân tích kết quả học tập theo từng môn (theo quy tắc):
+        - Trên 8 điểm: học tập tốt
+        - Từ 6 đến 8 điểm: có sự nỗ lực trong học tập
+        - Dưới 5 điểm: cần cố gắng thêm
+
+        Kết quả học tập từng môn:
         {danh_gia}
 
-        Yêu cầu khi viết nhận xét gửi phụ huynh:
-        1. Liệt kê rõ kết quả từng môn học với điểm trung bình và xếp loại (Giỏi / Cần cố gắng thêm / Cần nỗ lực nhiều).
-        2. Nêu ưu điểm và hạn chế của học sinh.
-        3. Nhận xét về thái độ, kỷ luật, vệ sinh, tham gia phong trào...
-        4. Đưa ra lời khuyên cụ thể để giúp học sinh tiến bộ hơn.
+        Hãy viết một nhận xét gửi phụ huynh, trong đó:
+        - Mở đầu: chào phụ huynh, giới thiệu mục đích thư.
+        - Nhận xét chi tiết về học tập dựa vào phân tích trên (nêu rõ từng môn).
+        - Nêu ưu điểm và hạn chế chung.
+        - Nhận xét về thái độ, kỷ luật, vệ sinh, phong trào.
+        - Đưa ra lời khuyên cụ thể để giúp học sinh tiến bộ hơn.
         """
 
         resp = openai.chat.completions.create(
@@ -172,7 +164,7 @@ def ai_nhan_xet(thong_tin):
                 {"role": "system", "content": "Bạn là một giáo viên chủ nhiệm tận tâm, viết nhận xét rõ ràng, thân thiện và chi tiết."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=500
+            max_tokens=600
         )
         return resp.choices[0].message.content
 
@@ -209,23 +201,14 @@ if df is not None:
                 ten_hs = results["Họ tên"].iloc[0]
                 st.subheader(f"📌 Kết quả học tập của {ten_hs} (ID: {student_id})")
 
-                # Hiển thị toàn bộ tuần (T2 → T7)
                 st.dataframe(results)
 
-                # Gom nhóm theo tuần để xem tổng điểm
                 if {"Tuần", "Tổng điểm tuần"}.issubset(results.columns):
                     tong_tuan = results.groupby("Tuần", as_index=False)["Tổng điểm tuần"].sum()
                     st.subheader("📊 Tổng điểm theo từng tuần")
                     st.dataframe(tong_tuan)
 
-                # Nhận xét AI
                 if st.button("📌 Nhận xét phụ huynh"):
-                    # Hiển thị bảng phân loại môn học
-                    st.subheader("📊 Kết quả phân loại môn học")
-                    dg = danh_gia_mon_hoc(results)
-                    st.table(pd.DataFrame(dg.items(), columns=["Môn học", "Đánh giá"]))
-
-                    # Gọi AI nhận xét
                     nhan_xet = ai_nhan_xet(results)
                     if nhan_xet:
                         st.success("✅ Nhận xét đã tạo:")
@@ -266,3 +249,4 @@ if df is not None:
 
             st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
             st.dataframe(top4[["ID", "Họ tên", "Tổng điểm tuần"]])
+
