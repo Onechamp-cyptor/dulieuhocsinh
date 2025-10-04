@@ -6,12 +6,12 @@ import openai
 import plotly.express as px
 
 # ---------------------------
-# Cấu hình Streamlit
+# ⚙️ Cấu hình Streamlit
 # ---------------------------
 st.set_page_config(page_title="Quản lý điểm học sinh", page_icon="📘", layout="wide")
 
 # ---------------------------
-# CSS style Google-like
+# 🎨 CSS giao diện
 # ---------------------------
 st.markdown("""
     <style>
@@ -55,7 +55,7 @@ st.markdown("""
 st.title("📘 Quản lý điểm học sinh (Google Sheets + AI)")
 
 # ---------------------------
-# Hàm tải dữ liệu Google Sheets
+# 📊 Hàm tải dữ liệu Google Sheets
 # ---------------------------
 def load_data():
     try:
@@ -74,16 +74,17 @@ def load_data():
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
 
-        # 🧹 Loại bỏ hàng trống hoàn toàn hoặc không có ID
-        df = df.dropna(how="all")
-        if "ID" in df.columns:
-            df = df[df["ID"].notna()]
-            df = df[df["ID"].astype(str).str.strip() != ""]
+        # 🧹 Chỉ loại bỏ đúng hàng trống (mọi ô đều rỗng hoặc None)
+        df = df[~df.apply(lambda row: all((str(x).strip() in ["", "None", "nan"]) for x in row), axis=1)]
+
+        # ✅ Giữ lại các hàng có ID hoặc Tuần (T2→T7 vẫn còn)
+        if {"ID", "Tuần"}.issubset(df.columns):
+            df = df[(df["ID"].notna()) | (df["Tuần"].notna())]
 
         # Thay "" thành None
         df = df.replace("", None)
 
-        # Điền ID và Họ tên xuống các dòng trống (để T2→T7 đủ)
+        # ✅ Điền lại ID & Họ tên cho các dòng bên dưới (ví dụ T3–T7)
         if {"ID", "Họ tên"}.issubset(df.columns):
             df[["ID", "Họ tên"]] = df[["ID", "Họ tên"]].ffill()
 
@@ -93,9 +94,8 @@ def load_data():
         st.exception(e)
         return None, None
 
-
 # ---------------------------
-# Quy đổi dữ liệu tick / X
+# 🔄 Quy đổi dữ liệu tick / X
 # ---------------------------
 def xu_ly_du_lieu(thong_tin):
     df = thong_tin.copy()
@@ -110,9 +110,8 @@ def xu_ly_du_lieu(thong_tin):
         })
     return df
 
-
 # ---------------------------
-# Hàm AI nhận xét học sinh (AI tự phân tích mềm mại)
+# 🤖 Hàm AI nhận xét học sinh (AI tự viết mềm mại)
 # ---------------------------
 def ai_nhan_xet(thong_tin):
     try:
@@ -154,9 +153,8 @@ def ai_nhan_xet(thong_tin):
         st.exception(e)
         return None
 
-
 # ---------------------------
-# Giao diện chính
+# 🧭 Giao diện chính
 # ---------------------------
 sheet, df = load_data()
 
@@ -171,7 +169,7 @@ if df is not None:
 
     menu = st.sidebar.radio("📌 Chọn chức năng", ["Tra cứu học sinh", "Thống kê lớp"])
 
-    # ------------------ TRA CỨU ------------------
+    # ------------------ 🔍 TRA CỨU ------------------
     if menu == "Tra cứu học sinh":
         st.subheader("🔍 Tra cứu học sinh")
         student_id = st.text_input("Nhập ID")
@@ -198,7 +196,7 @@ if df is not None:
             else:
                 st.info("⚠️ Không tìm thấy học sinh")
 
-    # ------------------ THỐNG KÊ ------------------
+    # ------------------ 📊 THỐNG KÊ ------------------
     elif menu == "Thống kê lớp":
         st.subheader("📊 Thống kê lớp")
 
@@ -231,6 +229,7 @@ if df is not None:
 
             st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
             st.dataframe(top4[["ID", "Họ tên", "Tổng điểm tuần"]])
+
 
 
 
