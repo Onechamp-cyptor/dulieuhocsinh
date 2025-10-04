@@ -38,6 +38,11 @@ st.markdown("""
         background-color: #0F9D58;
         color: white;
     }
+    div[data-baseweb="input"] > input {
+        border: 1px solid #dadce0;
+        border-radius: 8px;
+        padding: 6px 12px;
+    }
     div[data-testid="stDataFrame"] {
         border-radius: 10px;
         border: 1px solid #dadce0;
@@ -72,7 +77,7 @@ def load_data():
         # 🧹 Xoá hàng trống thật sự
         df = df[df.apply(lambda row: not all(str(x).strip() == "" for x in row), axis=1)]
 
-        # ✅ Tự động điền ID và Họ tên bị trống để hiển thị đủ T2–T7
+        # ✅ Điền lại ID và Họ tên (để hiện đủ T2–T7)
         if {"ID", "Họ tên"}.issubset(df.columns):
             df["ID"] = df["ID"].replace("", None)
             df["Họ tên"] = df["Họ tên"].replace("", None)
@@ -88,6 +93,19 @@ def load_data():
         return None, None
 
 # ---------------------------
+# 🧮 Hàm xếp loại học sinh
+# ---------------------------
+def xep_loai(diem):
+    if diem >= 700:
+        return "Xuất sắc 🏆"
+    elif diem >= 500:
+        return "Tốt 👍"
+    elif diem >= 300:
+        return "Khá 💪"
+    else:
+        return "Cần cố gắng ⚠️"
+
+# ---------------------------
 # 🤖 Hàm AI nhận xét học sinh
 # ---------------------------
 def ai_nhan_xet(thong_tin):
@@ -95,16 +113,21 @@ def ai_nhan_xet(thong_tin):
         openai.api_key = st.secrets["openai"]["api_key"]
 
         prompt = f"""
-        Bạn là giáo viên chủ nhiệm. Đây là dữ liệu chi tiết của học sinh:
+        Bạn là giáo viên chủ nhiệm. Đây là dữ liệu chi tiết của học sinh (có điểm từng môn):
 
         {thong_tin.to_dict(orient="records")}
 
         Quy tắc phân tích:
         - Trên 8 điểm: học tập tốt
-        - Từ 6 đến 8 điểm: có sự nỗ lực
+        - Từ 6 đến 8 điểm: có sự nỗ lực trong học tập
         - Dưới 5 điểm: cần cố gắng thêm
 
-        Viết nhận xét gửi phụ huynh theo phong cách thân thiện, mềm mại, truyền cảm hứng.
+        Nhiệm vụ:
+        Hãy viết một nhận xét gửi phụ huynh theo phong cách mềm mại, tự nhiên, tránh liệt kê khô khan. 
+        - Mở đầu: chào phụ huynh và giới thiệu mục đích.
+        - Phân tích chung tình hình học tập, nêu môn nào em làm tốt, môn nào có sự nỗ lực, môn nào cần cố gắng thêm.
+        - Nêu ưu điểm, hạn chế, thái độ, kỷ luật, vệ sinh, phong trào.
+        - Kết thúc bằng lời khuyên thân thiện, tích cực dành cho phụ huynh.
         """
 
         resp = openai.chat.completions.create(
@@ -116,8 +139,9 @@ def ai_nhan_xet(thong_tin):
             max_tokens=600
         )
         return resp.choices[0].message.content
+
     except Exception as e:
-        st.error("❌ Lỗi gọi OpenAI API")
+        st.error("❌ Lỗi khi gọi OpenAI API")
         st.exception(e)
         return None
 
@@ -139,9 +163,10 @@ if df is not None:
 
         if student_id:
             results = df[df["ID"] == str(student_id)]
+
             if not results.empty:
                 ten_hs = results["Họ tên"].iloc[0]
-                st.subheader(f"📋 Kết quả học tập của {ten_hs} (ID: {student_id})")
+                st.subheader(f"📌 Kết quả học tập của {ten_hs} (ID: {student_id})")
                 st.dataframe(results)
 
                 if st.button("📋 Nhận xét"):
@@ -154,65 +179,52 @@ if df is not None:
 
     # ------------------ THỐNG KÊ ------------------
     elif menu == "Thống kê lớp":
-        st.subheader("📊 Thống kê lớp")
-
-        # ✅ Chỉ lấy các cột cần thiết
-        cols = [
-            "ID", "Họ tên", "Điểm danh", "Đi học đúng giờ", "Đồng phục",
-            "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào", "Tổng điểm"
-        ]
-        df_filtered = df[[c for c in cols if c in df.columns]].copy()
-
-        # ✅ Chuyển Tổng điểm sang số
-        if "Tổng điểm" in df_filtered.columns:
-            df_filtered["Tổng điểm"] = pd.to_numeric(df_filtered["Tổng điểm"], errors="coerce").fillna(0).astype(int)
-
-        # ✅ Tự động xếp loại
-        def xep_loai(diem):
-            if diem >= 90:
-                return "Xuất sắc 🏆"
-            elif diem >= 75:
-                return "Tốt 👍"
-            elif diem >= 50:
-                return "Khá 🙂"
-            else:
-                return "Cần cố gắng ⚠️"
-
-        df_filtered["Xếp loại"] = df_filtered["Tổng điểm"].apply(xep_loai)
-
-        # ✅ Hiển thị điểm trung bình toàn lớp
-        if "Tổng điểm" in df_filtered.columns and len(df_filtered) > 0:
-            st.metric("🎯 Điểm trung bình cả lớp", round(df_filtered["Tổng điểm"].mean(), 2))
-
-        # ✅ Hiển thị bảng thống kê lớp
-        st.dataframe(df_filtered)
+        st.header("📊 Thống kê lớp")
+        st.subheader("📉 Thống kê vi phạm theo tiêu chí")
 
         # ✅ Thống kê vi phạm
-        st.subheader("📈 Thống kê vi phạm theo tiêu chí")
-        cols_check = ["Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
-        vi_pham = {col: (df[col] == "X").sum() for col in cols_check if col in df.columns}
+        cols_check = ["Điểm danh", "Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
+        vi_pham = {}
+        for col in cols_check:
+            if col in df.columns:
+                vi_pham[col] = (df[col] == "X").sum()
 
         if vi_pham:
-            fig_vp = px.bar(
+            fig = px.bar(
                 x=list(vi_pham.keys()),
                 y=list(vi_pham.values()),
                 labels={"x": "Tiêu chí", "y": "Số lần vi phạm"},
-                title="📌 Số lần vi phạm toàn lớp"
+                title="📌 Số lần vi phạm trong toàn lớp"
             )
-            st.plotly_chart(fig_vp)
+            st.plotly_chart(fig)
 
-        # ✅ Top 4 học sinh có Tổng điểm cao nhất
-        if {"ID", "Họ tên", "Tổng điểm"}.issubset(df_filtered.columns):
+        # ✅ Top 4 học sinh có tổng điểm cao nhất + tiêu chí
+        if {"ID", "Họ tên", "Tổng điểm"}.issubset(df.columns):
             top4 = (
-                df_filtered.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm"]
-                .sum()
+                df.groupby(["ID", "Họ tên"], as_index=False)
+                .agg({
+                    "Tổng điểm": "sum",
+                    "Điểm danh": lambda x: (x == "✓").sum(),
+                    "Đi học đúng giờ": lambda x: (x == "✓").sum(),
+                    "Đồng phục": lambda x: (x == "✓").sum(),
+                    "Thái độ học tập": lambda x: (x == "✓").sum(),
+                    "Trật tự": lambda x: (x == "✓").sum(),
+                    "Vệ sinh": lambda x: (x == "✓").sum(),
+                    "Phong trào": lambda x: (x == "✓").sum(),
+                })
                 .sort_values(by="Tổng điểm", ascending=False)
                 .head(4)
             )
+
             top4["Xếp loại"] = top4["Tổng điểm"].apply(xep_loai)
+            top4["Tổng điểm"] = top4["Tổng điểm"].astype(int)
 
             st.subheader("🏆 Top 4 học sinh có tổng điểm cao nhất")
-            st.dataframe(top4)
+            st.dataframe(top4[
+                ["ID", "Họ tên", "Điểm danh", "Đi học đúng giờ", "Đồng phục",
+                 "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào",
+                 "Tổng điểm", "Xếp loại"]
+            ])
 
             fig_top = px.bar(
                 top4,
@@ -223,6 +235,7 @@ if df is not None:
                 color="Họ tên"
             )
             st.plotly_chart(fig_top)
+
 
 
 
