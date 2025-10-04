@@ -168,11 +168,11 @@ if df is not None:
 
         # ✅ Tự động xếp loại
         def xep_loai(diem):
-            if diem >= 90:
+            if diem >= 800:
                 return "Xuất sắc 🏆"
-            elif diem >= 75:
+            elif diem >= 700:
                 return "Tốt 👍"
-            elif diem >= 50:
+            elif diem >= 600:
                 return "Khá 🙂"
             else:
                 return "Cần cố gắng ⚠️"
