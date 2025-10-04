@@ -52,7 +52,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📘 Tình hình học tập của học sinh  (Google Sheets + AI)")
+st.title("📘 Tình hình học tập của học sinh (Google Sheets + AI)")
 
 # ---------------------------
 # 📊 Hàm tải dữ liệu Google Sheets
@@ -81,10 +81,10 @@ def load_data():
         if {"ID", "Tuần"}.issubset(df.columns):
             df = df[(df["ID"].notna()) | (df["Tuần"].notna())]
 
-        # Thay "" thành None
-        df = df.replace("", None)
+        # ✅ Thay các giá trị None, "None", "nan" thành ô trống thật
+        df = df.replace(["", None, "None", "nan", "NaN"], "")
 
-        # ✅ Điền lại ID & Họ tên
+        # ✅ Điền lại ID & Họ tên để tránh trống dòng giữa tuần T2–T7
         if {"ID", "Họ tên"}.issubset(df.columns):
             df[["ID", "Họ tên"]] = df[["ID", "Họ tên"]].ffill()
 
@@ -230,4 +230,5 @@ if df is not None:
 
             st.subheader("🏆 Top 4 học sinh có điểm rèn luyện cao nhất (Tuyên dương)")
             st.dataframe(top4[["ID", "Họ tên", "Tổng điểm rèn luyện"]])
+
 
