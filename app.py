@@ -143,7 +143,7 @@ if df is not None:
                 st.info(f"✅ ID hợp lệ: {student_id} → Học sinh: **{ten_hs}**")
 
                 st.subheader(f"📋 Kết quả học tập của {ten_hs} (ID: {student_id})")
-                st.dataframe(results)
+                st.dataframe(results, hide_index=True)  # 👈 Ẩn cột index
 
                 if st.button("📋 Nhận xét"):
                     nhan_xet = ai_nhan_xet(results)
@@ -185,8 +185,8 @@ if df is not None:
 
         df_grouped["Xếp loại"] = df_grouped["Tổng điểm"].apply(xep_loai)
 
-        # ✅ Hiển thị kết quả
-        st.dataframe(df_grouped)
+        # ✅ Hiển thị kết quả (ẩn index)
+        st.dataframe(df_grouped, hide_index=True)
 
         # ✅ Thống kê vi phạm
         st.subheader("📈 Thống kê vi phạm theo tiêu chí")
@@ -202,10 +202,10 @@ if df is not None:
             )
             st.plotly_chart(fig_vp)
 
-        # ✅ Top 4 học sinh có tổng điểm cao nhất
+        # ✅ Top 4 học sinh có tổng điểm cao nhất (ẩn index)
         top4 = df_grouped.head(4)
         st.subheader("🏆 Top 4 học sinh có tổng điểm cao nhất")
-        st.dataframe(top4)
+        st.dataframe(top4, hide_index=True)
 
         fig_top = px.bar(
             top4,
@@ -216,4 +216,3 @@ if df is not None:
             color="Họ tên"
         )
         st.plotly_chart(fig_top)
-
