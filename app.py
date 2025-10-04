@@ -157,18 +157,22 @@ if df is not None:
     elif menu == "Thống kê lớp":
         st.subheader("📊 Thống kê lớp")
 
-        # ✅ Chỉ lấy các cột cần thiết
-        cols = [
-            "ID", "Họ tên", "Điểm danh", "Đi học đúng giờ", "Đồng phục",
-            "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào", "Tổng điểm"
-        ]
+        # ✅ Lấy cột cần thiết
+        cols = ["ID", "Họ tên", "Tổng điểm"]
         df_filtered = df[[c for c in cols if c in df.columns]].copy()
 
         # ✅ Chuyển Tổng điểm sang số
         if "Tổng điểm" in df_filtered.columns:
             df_filtered["Tổng điểm"] = pd.to_numeric(df_filtered["Tổng điểm"], errors="coerce").fillna(0).astype(int)
 
-        # ✅ Tự động xếp loại
+        # ✅ Gộp lại mỗi học sinh chỉ 1 dòng
+        df_grouped = (
+            df_filtered.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm"]
+            .sum()
+            .sort_values(by="Tổng điểm", ascending=False)
+        )
+
+        # ✅ Xếp loại theo tổng điểm
         def xep_loai(diem):
             if diem >= 800:
                 return "Xuất sắc 🏆"
@@ -179,12 +183,10 @@ if df is not None:
             else:
                 return "Cần cố gắng ⚠️"
 
-        df_filtered["Xếp loại"] = df_filtered["Tổng điểm"].apply(xep_loai)
+        df_grouped["Xếp loại"] = df_grouped["Tổng điểm"].apply(xep_loai)
 
-        # ✅ Hiển thị gọn 4 cột: ID, Họ tên, Tổng điểm, Xếp loại
-        cols_show = ["ID", "Họ tên", "Tổng điểm", "Xếp loại"]
-        df_show = df_filtered[[c for c in cols_show if c in df_filtered.columns]]
-        st.dataframe(df_show)
+        # ✅ Hiển thị kết quả
+        st.dataframe(df_grouped)
 
         # ✅ Thống kê vi phạm
         st.subheader("📈 Thống kê vi phạm theo tiêu chí")
@@ -200,27 +202,18 @@ if df is not None:
             )
             st.plotly_chart(fig_vp)
 
-        # ✅ Top 4 học sinh có Tổng điểm cao nhất
-        if {"ID", "Họ tên", "Tổng điểm"}.issubset(df_filtered.columns):
-            top4 = (
-                df_filtered.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm"]
-                .sum()
-                .sort_values(by="Tổng điểm", ascending=False)
-                .head(4)
-            )
-            top4["Xếp loại"] = top4["Tổng điểm"].apply(xep_loai)
+        # ✅ Top 4 học sinh có tổng điểm cao nhất
+        top4 = df_grouped.head(4)
+        st.subheader("🏆 Top 4 học sinh có tổng điểm cao nhất")
+        st.dataframe(top4)
 
-            st.subheader("🏆 Top 4 học sinh có tổng điểm cao nhất")
-            st.dataframe(top4)
-
-            fig_top = px.bar(
-                top4,
-                x="Họ tên",
-                y="Tổng điểm",
-                text="Tổng điểm",
-                title="📊 Biểu đồ Top 4 học sinh có tổng điểm cao nhất",
-                color="Họ tên"
-            )
-            st.plotly_chart(fig_top)
-
+        fig_top = px.bar(
+            top4,
+            x="Họ tên",
+            y="Tổng điểm",
+            text="Tổng điểm",
+            title="📊 Biểu đồ Top 4 học sinh có tổng điểm cao nhất",
+            color="Họ tên"
+        )
+        st.plotly_chart(fig_top)
 
