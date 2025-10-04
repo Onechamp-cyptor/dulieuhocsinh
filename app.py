@@ -74,19 +74,15 @@ def load_data():
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
 
-        # ❌ KHÔNG xoá hàng trống (chỉ loại bỏ hàng thực sự trống hoàn toàn)
+        # ✅ Giữ toàn bộ dòng, chỉ bỏ dòng thật sự rỗng
         df = df[df.apply(lambda row: not all(str(x).strip() == "" for x in row), axis=1)]
 
-        # ✅ Giữ nguyên các dòng có ID và Tuần
-        if {"ID", "Tuần"}.issubset(df.columns):
-            df = df[(df["ID"].notna()) & (df["ID"] != "")]
-
-        # ✅ Điền lại ID & Họ tên để hiển thị liên tục
+        # ✅ Điền ID & Họ tên để đảm bảo các dòng T3–T7 không bị loại bỏ
         if {"ID", "Họ tên"}.issubset(df.columns):
             df[["ID", "Họ tên"]] = df[["ID", "Họ tên"]].ffill()
 
-        # 🧹 Chuyển các giá trị "None", "nan" thành chuỗi rỗng để hiển thị trống
-        df = df.replace(["None", "nan", None, ""], "")
+        # ✅ Loại bỏ giá trị “None”, “nan” hiển thị thành trống
+        df = df.replace(["None", "nan", None], "")
 
         return sheet, df
 
@@ -101,16 +97,14 @@ def load_data():
 def ai_nhan_xet(thong_tin):
     try:
         openai.api_key = st.secrets["openai"]["api_key"]
-
         prompt = f"""
-        Bạn là giáo viên chủ nhiệm. Đây là dữ liệu chi tiết của học sinh:
+        Bạn là giáo viên chủ nhiệm. Đây là dữ liệu học tập của học sinh:
 
         {thong_tin.to_dict(orient="records")}
 
-        Hãy viết một nhận xét gửi phụ huynh:
-        - Phân tích kết quả học tập, nêu điểm mạnh – điểm yếu.
-        - Nhận xét thái độ, kỷ luật, phong trào.
-        - Cuối cùng khuyên nhẹ nhàng, tích cực.
+        Hãy viết một nhận xét thân thiện gửi phụ huynh:
+        - Nhận xét về học tập, thái độ, kỷ luật, phong trào.
+        - Nêu ưu điểm, khích lệ, góp ý nhẹ nhàng.
         """
 
         resp = openai.chat.completions.create(
@@ -122,7 +116,6 @@ def ai_nhan_xet(thong_tin):
             max_tokens=500
         )
         return resp.choices[0].message.content
-
     except Exception as e:
         st.error("❌ Lỗi khi gọi OpenAI API")
         st.exception(e)
@@ -145,13 +138,14 @@ if df is not None:
         student_id = st.text_input("Nhập ID")
 
         if student_id:
+            # ✅ Giữ toàn bộ dòng có cùng ID
             results = df[df["ID"] == str(student_id)]
 
             if not results.empty:
                 ten_hs = results["Họ tên"].iloc[0]
                 st.subheader(f"📌 Kết quả học tập của {ten_hs} (ID: {student_id})")
 
-                # Hiển thị đầy đủ các dòng T2–T7, ô trống không hiện None
+                # ✅ Hiển thị đầy đủ T2–T7, không hiện None
                 st.dataframe(results.fillna(""))
 
                 if st.button("📌 Nhận xét"):
@@ -167,7 +161,8 @@ if df is not None:
         st.subheader("📊 Thống kê lớp")
 
         if "Tổng điểm rèn luyện" in df.columns:
-            st.metric("Điểm rèn luyện trung bình cả lớp", round(df["Tổng điểm rèn luyện"].astype(float).mean(), 2))
+            df["Tổng điểm rèn luyện"] = pd.to_numeric(df["Tổng điểm rèn luyện"], errors="coerce").fillna(0)
+            st.metric("Điểm rèn luyện trung bình cả lớp", round(df["Tổng điểm rèn luyện"].mean(), 2))
 
         cols_check = ["Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
         vi_pham = {}
@@ -184,7 +179,7 @@ if df is not None:
             )
             st.plotly_chart(fig)
 
-        # ✅ Top học sinh có điểm rèn luyện cao nhất
+        # ✅ Top 4 học sinh có điểm rèn luyện cao nhất
         if {"ID", "Họ tên", "Tổng điểm rèn luyện"}.issubset(df.columns):
             top4 = (
                 df.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm rèn luyện"]
@@ -195,6 +190,7 @@ if df is not None:
             top4["Tổng điểm rèn luyện"] = top4["Tổng điểm rèn luyện"].astype(int)
             st.subheader("🏆 Top 4 học sinh có điểm rèn luyện cao nhất (Tuyên dương)")
             st.dataframe(top4[["ID", "Họ tên", "Tổng điểm rèn luyện"]])
+
 
 
 
