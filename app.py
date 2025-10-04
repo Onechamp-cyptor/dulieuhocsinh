@@ -140,6 +140,10 @@ if df is not None:
             results = df[df["ID"] == str(student_id)]
             if not results.empty:
                 ten_hs = results["Họ tên"].iloc[0]
+
+                # 👉 Hiển thị tên học sinh ngay khi nhập ID
+                st.info(f"✅ ID hợp lệ: {student_id} → Học sinh: **{ten_hs}**")
+
                 st.subheader(f"📋 Kết quả học tập của {ten_hs} (ID: {student_id})")
                 st.dataframe(results)
 
@@ -149,7 +153,7 @@ if df is not None:
                         st.success("✅ Nhận xét đã tạo:")
                         st.write(nhan_xet)
             else:
-                st.info("⚠️ Không tìm thấy học sinh")
+                st.warning("⚠️ Không tìm thấy học sinh với ID này")
 
     # ------------------ THỐNG KÊ ------------------
     elif menu == "Thống kê lớp":
@@ -184,7 +188,7 @@ if df is not None:
 
         # ✅ Thống kê vi phạm
         st.subheader("📈 Thống kê vi phạm theo tiêu chí")
-        cols_check = ["Điển danh", "Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
+        cols_check = ["Điểm danh", "Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
         vi_pham = {col: (df[col] == "X").sum() for col in cols_check if col in df.columns}
 
         if vi_pham:
@@ -218,3 +222,4 @@ if df is not None:
                 color="Họ tên"
             )
             st.plotly_chart(fig_top)
+
