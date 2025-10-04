@@ -8,7 +8,7 @@ import plotly.express as px
 # ---------------------------
 # ⚙️ Cấu hình Streamlit
 # ---------------------------
-st.set_page_config(page_title="Tình hình học tập của học sinh", page_icon="📘", layout="wide")
+st.set_page_config(page_title="Quản lý điểm học sinh", page_icon="📘", layout="wide")
 
 # ---------------------------
 # 🎨 CSS giao diện
@@ -52,7 +52,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📘 Tình hình học tập của học sinh (Google Sheets + AI)")
+st.title("📘 Quản lý điểm học sinh (Google Sheets + AI)")
 
 # ---------------------------
 # 📊 Hàm tải dữ liệu Google Sheets
@@ -74,17 +74,17 @@ def load_data():
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
 
-        # 🧹 Chỉ loại bỏ đúng hàng trống (mọi ô đều rỗng hoặc None)
+        # 🧹 Xoá hàng trống thật sự (mọi ô đều rỗng)
         df = df[~df.apply(lambda row: all((str(x).strip() in ["", "None", "nan"]) for x in row), axis=1)]
 
-        # ✅ Giữ lại các hàng có ID hoặc Tuần (T2→T7 vẫn còn)
+        # ✅ Giữ lại hàng có ID hoặc Tuần
         if {"ID", "Tuần"}.issubset(df.columns):
             df = df[(df["ID"].notna()) | (df["Tuần"].notna())]
 
         # Thay "" thành None
         df = df.replace("", None)
 
-        # ✅ Điền lại ID & Họ tên cho các dòng bên dưới (ví dụ T3–T7)
+        # ✅ Điền lại ID & Họ tên
         if {"ID", "Họ tên"}.issubset(df.columns):
             df[["ID", "Họ tên"]] = df[["ID", "Họ tên"]].ffill()
 
@@ -111,7 +111,7 @@ def xu_ly_du_lieu(thong_tin):
     return df
 
 # ---------------------------
-# 🤖 Hàm AI nhận xét học sinh (AI tự viết mềm mại)
+# 🤖 Hàm AI nhận xét học sinh
 # ---------------------------
 def ai_nhan_xet(thong_tin):
     try:
@@ -132,16 +132,15 @@ def ai_nhan_xet(thong_tin):
         Nhiệm vụ:
         Hãy viết một nhận xét gửi phụ huynh theo phong cách mềm mại, tự nhiên, tránh liệt kê khô khan. 
         - Mở đầu: chào phụ huynh và giới thiệu mục đích.
-        - Phân tích chung tình hình học tập, nêu môn nào em làm tốt, môn nào có sự nỗ lực, môn nào cần cố gắng thêm (AI tự diễn đạt dựa vào điểm).
-        - Nêu ưu điểm và hạn chế chung.
-        - Nhận xét thêm về thái độ, kỷ luật, vệ sinh, phong trào.
+        - Phân tích chung tình hình học tập, nêu môn nào em làm tốt, môn nào có sự nỗ lực, môn nào cần cố gắng thêm.
+        - Nêu ưu điểm, hạn chế, thái độ, kỷ luật, vệ sinh, phong trào.
         - Kết thúc bằng lời khuyên thân thiện, tích cực dành cho phụ huynh.
         """
 
         resp = openai.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Bạn là giáo viên chủ nhiệm tận tâm, viết nhận xét rõ ràng, thân thiện, mượt mà và truyền cảm hứng."},
+                {"role": "system", "content": "Bạn là giáo viên chủ nhiệm tận tâm, viết nhận xét thân thiện, tự nhiên, truyền cảm hứng."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=600
@@ -162,14 +161,15 @@ if df is not None:
     if "ID" in df.columns:
         df["ID"] = df["ID"].astype(str)
 
+    # Đổi cột: Tổng điểm tuần → Tổng điểm rèn luyện
     if "Tổng điểm" in df.columns:
         df["Tổng điểm"] = pd.to_numeric(df["Tổng điểm"], errors="coerce").fillna(0)
-    if "Tổng điểm tuần" in df.columns:
-        df["Tổng điểm tuần"] = pd.to_numeric(df["Tổng điểm tuần"], errors="coerce").fillna(0)
+    if "Tổng điểm rèn luyện" in df.columns:
+        df["Tổng điểm rèn luyện"] = pd.to_numeric(df["Tổng điểm rèn luyện"], errors="coerce").fillna(0)
 
     menu = st.sidebar.radio("📌 Chọn chức năng", ["Tra cứu học sinh", "Thống kê lớp"])
 
-    # ------------------ 🔍 TRA CỨU ------------------
+    # ------------------ TRA CỨU ------------------
     if menu == "Tra cứu học sinh":
         st.subheader("🔍 Tra cứu học sinh")
         student_id = st.text_input("Nhập ID")
@@ -183,12 +183,13 @@ if df is not None:
 
                 st.dataframe(results)
 
-                if {"Tuần", "Tổng điểm tuần"}.issubset(results.columns):
-                    tong_tuan = results.groupby("Tuần", as_index=False)["Tổng điểm tuần"].sum()
-                    st.subheader("📊 Tổng điểm theo từng tuần")
+                # ✅ Hiển thị điểm rèn luyện
+                if {"Tuần", "Tổng điểm rèn luyện"}.issubset(results.columns):
+                    tong_tuan = results.groupby("Tuần", as_index=False)["Tổng điểm rèn luyện"].sum()
+                    st.subheader("📊 Tổng điểm rèn luyện theo từng tuần")
                     st.dataframe(tong_tuan)
 
-                if st.button("📌 Nhận xét"):
+                if st.button("📌 Nhận xét phụ huynh"):
                     nhan_xet = ai_nhan_xet(results)
                     if nhan_xet:
                         st.success("✅ Nhận xét đã tạo:")
@@ -196,12 +197,12 @@ if df is not None:
             else:
                 st.info("⚠️ Không tìm thấy học sinh")
 
-    # ------------------ 📊 THỐNG KÊ ------------------
+    # ------------------ THỐNG KÊ ------------------
     elif menu == "Thống kê lớp":
         st.subheader("📊 Thống kê lớp")
 
-        if "Tổng điểm tuần" in df.columns:
-            st.metric("Điểm trung bình cả lớp", round(df["Tổng điểm tuần"].mean(), 2))
+        if "Tổng điểm rèn luyện" in df.columns:
+            st.metric("Điểm rèn luyện trung bình cả lớp", round(df["Tổng điểm rèn luyện"].mean(), 2))
 
         cols_check = ["Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
         vi_pham = {}
@@ -218,18 +219,16 @@ if df is not None:
             )
             st.plotly_chart(fig)
 
-        if {"ID", "Họ tên", "Tổng điểm tuần"}.issubset(df.columns):
+        # ✅ Top học sinh có điểm rèn luyện cao nhất
+        if {"ID", "Họ tên", "Tổng điểm rèn luyện"}.issubset(df.columns):
             top4 = (
-                df.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm tuần"]
+                df.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm rèn luyện"]
                 .sum()
-                .sort_values(by="Tổng điểm tuần", ascending=False)
+                .sort_values(by="Tổng điểm rèn luyện", ascending=False)
                 .head(4)
             )
-            top4["Tổng điểm tuần"] = top4["Tổng điểm tuần"].astype(int)
+            top4["Tổng điểm rèn luyện"] = top4["Tổng điểm rèn luyện"].astype(int)
 
-            st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
-            st.dataframe(top4[["ID", "Họ tên", "Tổng điểm tuần"]])
-
-
-
+            st.subheader("🏆 Top 4 học sinh có điểm rèn luyện cao nhất (Tuyên dương)")
+            st.dataframe(top4[["ID", "Họ tên", "Tổng điểm rèn luyện"]])
 
