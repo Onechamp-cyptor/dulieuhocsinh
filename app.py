@@ -74,29 +74,22 @@ def load_data():
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
 
-        # 🧹 Giữ lại các dòng có dữ liệu thực (có ID, Tuần hoặc Thứ)
-        df = df[
-            df.apply(
-                lambda row: any(str(x).strip() not in ["", "None", "nan"] for x in row)
-                or str(row.get("Tuần", "")).strip() != ""
-                or str(row.get("Thứ", "")).strip() != "",
-                axis=1
-            )
-        ]
+        # 🧹 Chỉ xoá các hàng hoàn toàn rỗng (mọi ô đều trống)
+        df = df[~df.apply(lambda row: all(str(x).strip() == "" for x in row), axis=1)]
 
-        # ✅ Thay các giá trị None, "None", "nan" thành ô trống thật
-        df = df.replace(["", None, "None", "nan", "NaN"], "")
+        # ✅ Xoá chữ "None", "nan" → để trống
+        df = df.replace(["None", "nan", "NaN"], "")
 
-        # ✅ Điền lại ID & Họ tên để tránh trống dòng giữa tuần T2–T7
+        # ✅ Giữ nguyên tất cả các hàng có cùng ID (kể cả trống Tuần/Thứ)
         if {"ID", "Họ tên"}.issubset(df.columns):
             df[["ID", "Họ tên"]] = df[["ID", "Họ tên"]].ffill()
 
         return sheet, df
+
     except Exception as e:
         st.error("❌ Lỗi tải dữ liệu Google Sheets")
         st.exception(e)
         return None, None
-
 
 # ---------------------------
 # 🔄 Quy đổi dữ liệu tick / X
@@ -107,7 +100,6 @@ def xu_ly_du_lieu(thong_tin):
         df[col] = df[col].replace({
             "✓": "Đạt (+20 điểm)",
             "X": "Chưa đạt (-30 điểm)",
-            None: "Không ghi nhận",
             "": "Không ghi nhận",
             True: "Có (✓)",
             False: "Không"
@@ -231,5 +223,6 @@ if df is not None:
 
             st.subheader("🏆 Top 4 học sinh có điểm rèn luyện cao nhất (Tuyên dương)")
             st.dataframe(top4[["ID", "Họ tên", "Tổng điểm rèn luyện"]])
+
 
 
