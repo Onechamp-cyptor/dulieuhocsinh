@@ -192,35 +192,38 @@ if df is not None:
 
         # ✅ Tổng hợp điểm theo từng học sinh
         if {"ID", "Họ tên"}.issubset(df.columns):
-            diem_cols = ["Điểm danh", "Đi học đúng giờ", "Đồng phục", "Thái độ học tập",
-                         "Trật tự", "Vệ sinh", "Phong trào", "Tổng điểm rèn luyện"]
+            expected_cols = ["Điểm danh", "Đi học đúng giờ", "Đồng phục", "Thái độ học tập",
+                             "Trật tự", "Vệ sinh", "Phong trào", "Tổng điểm rèn luyện"]
 
-            diem_cols = [c for c in diem_cols if c in df.columns]
+            # Chỉ giữ cột có thật
+            diem_cols = [c for c in expected_cols if c in df.columns]
 
-            tong_diem = df.groupby(["ID", "Họ tên"], as_index=False)[diem_cols].sum(numeric_only=True)
-            tong_diem["Tổng điểm"] = tong_diem[diem_cols].sum(axis=1)
+            if diem_cols:
+                tong_diem = df.groupby(["ID", "Họ tên"], as_index=False)[diem_cols].sum(numeric_only=True)
+                tong_diem["Tổng điểm"] = tong_diem[diem_cols].sum(axis=1)
 
-            def xep_loai(diem):
-                diem = float(diem)
-                if diem >= 700:
-                    return "Xuất sắc 🏆"
-                elif diem >= 500:
-                    return "Tốt 👍"
-                elif diem >= 400:
-                    return "Khá 😊"
-                else:
-                    return "Cần cố gắng ⚠️"
+                # ✅ Hàm xếp loại
+                def xep_loai(diem):
+                    diem = float(diem)
+                    if diem >= 700:
+                        return "Xuất sắc 🏆"
+                    elif diem >= 500:
+                        return "Tốt 👍"
+                    elif diem >= 400:
+                        return "Khá 😊"
+                    else:
+                        return "Cần cố gắng ⚠️"
 
-            tong_diem["Xếp loại"] = tong_diem["Tổng điểm"].apply(xep_loai)
-            tong_diem["Tổng điểm"] = tong_diem["Tổng điểm"].astype(int)
+                tong_diem["Xếp loại"] = tong_diem["Tổng điểm"].apply(xep_loai)
+                tong_diem["Tổng điểm"] = tong_diem["Tổng điểm"].astype(int)
 
-            # ✅ Top 4 học sinh điểm cao nhất
-            top4 = tong_diem.sort_values(by="Tổng điểm", ascending=False).head(4)
+                # ✅ Top 4 học sinh điểm cao nhất
+                top4 = tong_diem.sort_values(by="Tổng điểm", ascending=False).head(4)
 
-            st.subheader("🏅 Top 4 học sinh có tổng điểm cao nhất")
-            st.dataframe(top4[["ID", "Họ tên", "Điểm danh", "Đi học đúng giờ", "Đồng phục",
-                               "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào",
-                               "Tổng điểm", "Xếp loại"]])
+                st.subheader("🏅 Top 4 học sinh có tổng điểm cao nhất")
+                st.dataframe(top4[["ID", "Họ tên"] + diem_cols + ["Tổng điểm", "Xếp loại"]])
+            else:
+                st.error("⚠️ Không tìm thấy cột nào hợp lệ để thống kê.")
 
 
 
