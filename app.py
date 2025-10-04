@@ -74,12 +74,15 @@ def load_data():
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
 
-        # 🧹 Xoá hàng trống thật sự (mọi ô đều rỗng)
-        df = df[~df.apply(lambda row: all((str(x).strip() in ["", "None", "nan"]) for x in row), axis=1)]
-
-        # ✅ Giữ lại hàng có ID hoặc Tuần
-        if {"ID", "Tuần"}.issubset(df.columns):
-            df = df[(df["ID"].notna()) | (df["Tuần"].notna())]
+        # 🧹 Giữ lại các dòng có dữ liệu thực (có ID, Tuần hoặc Thứ)
+        df = df[
+            df.apply(
+                lambda row: any(str(x).strip() not in ["", "None", "nan"] for x in row)
+                or str(row.get("Tuần", "")).strip() != ""
+                or str(row.get("Thứ", "")).strip() != "",
+                axis=1
+            )
+        ]
 
         # ✅ Thay các giá trị None, "None", "nan" thành ô trống thật
         df = df.replace(["", None, "None", "nan", "NaN"], "")
@@ -93,6 +96,7 @@ def load_data():
         st.error("❌ Lỗi tải dữ liệu Google Sheets")
         st.exception(e)
         return None, None
+
 
 # ---------------------------
 # 🔄 Quy đổi dữ liệu tick / X
@@ -160,7 +164,6 @@ if df is not None:
     if "ID" in df.columns:
         df["ID"] = df["ID"].astype(str)
 
-    # Đổi cột: Tổng điểm tuần → Tổng điểm rèn luyện
     if "Tổng điểm" in df.columns:
         df["Tổng điểm"] = pd.to_numeric(df["Tổng điểm"], errors="coerce").fillna(0)
     if "Tổng điểm rèn luyện" in df.columns:
@@ -182,7 +185,6 @@ if df is not None:
 
                 st.dataframe(results)
 
-                # ✅ Hiển thị điểm rèn luyện
                 if {"Tuần", "Tổng điểm rèn luyện"}.issubset(results.columns):
                     tong_tuan = results.groupby("Tuần", as_index=False)["Tổng điểm rèn luyện"].sum()
                     st.subheader("📊 Tổng điểm rèn luyện theo từng tuần")
@@ -218,7 +220,6 @@ if df is not None:
             )
             st.plotly_chart(fig)
 
-        # ✅ Top học sinh có điểm rèn luyện cao nhất
         if {"ID", "Họ tên", "Tổng điểm rèn luyện"}.issubset(df.columns):
             top4 = (
                 df.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm rèn luyện"]
