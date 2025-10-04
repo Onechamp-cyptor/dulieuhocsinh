@@ -188,7 +188,7 @@ if df is not None:
                     st.subheader("📊 Tổng điểm theo từng tuần")
                     st.dataframe(tong_tuan)
 
-                if st.button("📌 Nhận xét phụ huynh"):
+                if st.button("📌 Nhận xét"):
                     nhan_xet = ai_nhan_xet(results)
                     if nhan_xet:
                         st.success("✅ Nhận xét đã tạo:")
