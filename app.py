@@ -74,8 +74,16 @@ def load_data():
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
 
+        # 🧹 Loại bỏ hàng trống hoàn toàn hoặc không có ID
+        df = df.dropna(how="all")
+        if "ID" in df.columns:
+            df = df[df["ID"].notna()]
+            df = df[df["ID"].astype(str).str.strip() != ""]
+
+        # Thay "" thành None
         df = df.replace("", None)
 
+        # Điền ID và Họ tên xuống các dòng trống (để T2→T7 đủ)
         if {"ID", "Họ tên"}.issubset(df.columns):
             df[["ID", "Họ tên"]] = df[["ID", "Họ tên"]].ffill()
 
@@ -84,6 +92,7 @@ def load_data():
         st.error("❌ Lỗi tải dữ liệu Google Sheets")
         st.exception(e)
         return None, None
+
 
 # ---------------------------
 # Quy đổi dữ liệu tick / X
@@ -100,6 +109,7 @@ def xu_ly_du_lieu(thong_tin):
             False: "Không"
         })
     return df
+
 
 # ---------------------------
 # Hàm AI nhận xét học sinh (AI tự phân tích mềm mại)
@@ -143,6 +153,7 @@ def ai_nhan_xet(thong_tin):
         st.error("❌ Lỗi khi gọi OpenAI API")
         st.exception(e)
         return None
+
 
 # ---------------------------
 # Giao diện chính
@@ -220,5 +231,6 @@ if df is not None:
 
             st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
             st.dataframe(top4[["ID", "Họ tên", "Tổng điểm tuần"]])
+
 
 
