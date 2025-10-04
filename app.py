@@ -74,15 +74,15 @@ def load_data():
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
 
-        # 🧹 Xoá hàng trống thật sự (mọi ô đều rỗng)
+        # 🧹 Xoá hàng trống thật sự
         df = df[~df.apply(lambda row: all((str(x).strip() in ["", "None", "nan"]) for x in row), axis=1)]
 
         # ✅ Giữ lại hàng có ID hoặc Tuần
         if {"ID", "Tuần"}.issubset(df.columns):
             df = df[(df["ID"].notna()) | (df["Tuần"].notna())]
 
-        # Thay "" thành None
-        df = df.replace("", None)
+        # ✅ Thay None / trống / “None” bằng ô rỗng thật sự
+        df = df.replace(["", None, "None"], "")
 
         # ✅ Điền lại ID & Họ tên
         if {"ID", "Họ tên"}.issubset(df.columns):
@@ -103,8 +103,8 @@ def xu_ly_du_lieu(thong_tin):
         df[col] = df[col].replace({
             "✓": "Đạt (+20 điểm)",
             "X": "Chưa đạt (-30 điểm)",
-            None: "Không ghi nhận",
-            "": "Không ghi nhận",
+            None: "",
+            "": "",
             True: "Có (✓)",
             False: "Không"
         })
@@ -189,7 +189,7 @@ if df is not None:
                     st.subheader("📊 Tổng điểm rèn luyện theo từng tuần")
                     st.dataframe(tong_tuan)
 
-                if st.button("📌 Nhận xét phụ huynh"):
+                if st.button("📌 Nhận xét"):
                     nhan_xet = ai_nhan_xet(results)
                     if nhan_xet:
                         st.success("✅ Nhận xét đã tạo:")
@@ -231,4 +231,5 @@ if df is not None:
 
             st.subheader("🏆 Top 4 học sinh có điểm rèn luyện cao nhất (Tuyên dương)")
             st.dataframe(top4[["ID", "Họ tên", "Tổng điểm rèn luyện"]])
+
 
