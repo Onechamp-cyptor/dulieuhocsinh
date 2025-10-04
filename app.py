@@ -195,12 +195,19 @@ if df is not None:
             expected_cols = ["Điểm danh", "Đi học đúng giờ", "Đồng phục", "Thái độ học tập",
                              "Trật tự", "Vệ sinh", "Phong trào", "Tổng điểm rèn luyện"]
 
-            # Chỉ giữ cột có thật
+            # Chỉ giữ cột có thật trong df
             diem_cols = [c for c in expected_cols if c in df.columns]
 
             if diem_cols:
                 tong_diem = df.groupby(["ID", "Họ tên"], as_index=False)[diem_cols].sum(numeric_only=True)
-                tong_diem["Tổng điểm"] = tong_diem[diem_cols].sum(axis=1)
+
+                # Chỉ cộng các cột còn tồn tại sau groupby
+                valid_cols = [c for c in diem_cols if c in tong_diem.columns]
+
+                if valid_cols:
+                    tong_diem["Tổng điểm"] = tong_diem[valid_cols].sum(axis=1)
+                else:
+                    tong_diem["Tổng điểm"] = 0
 
                 # ✅ Hàm xếp loại
                 def xep_loai(diem):
@@ -221,7 +228,7 @@ if df is not None:
                 top4 = tong_diem.sort_values(by="Tổng điểm", ascending=False).head(4)
 
                 st.subheader("🏅 Top 4 học sinh có tổng điểm cao nhất")
-                st.dataframe(top4[["ID", "Họ tên"] + diem_cols + ["Tổng điểm", "Xếp loại"]])
+                st.dataframe(top4[["ID", "Họ tên"] + valid_cols + ["Tổng điểm", "Xếp loại"]])
             else:
                 st.error("⚠️ Không tìm thấy cột nào hợp lệ để thống kê.")
 
