@@ -72,7 +72,6 @@ def load_data():
 
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
-
         df = df[df.apply(lambda row: not all(str(x).strip() == "" for x in row), axis=1)]
 
         if {"ID", "Họ tên"}.issubset(df.columns):
@@ -127,13 +126,9 @@ def export_pdf(ten_hs, nhan_xet):
     pdf = FPDF()
     pdf.add_page()
 
-    # 📝 Dùng font Unicode (DejaVuSans)
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-    if not os.path.exists(font_path):
-        st.warning("⚠️ Không tìm thấy font DejaVuSans, vui lòng cài font Unicode vào server nếu cần.")
     pdf.add_font("DejaVu", "", font_path, uni=True)
     pdf.set_font("DejaVu", "", 14)
-
     pdf.cell(0, 10, "NHẬN XÉT HỌC SINH", ln=True, align="C")
     pdf.ln(10)
     pdf.set_font("DejaVu", "", 12)
@@ -163,7 +158,6 @@ if df is not None:
                 ten_hs = results["Họ tên"].iloc[0]
                 st.info(f"✅ ID hợp lệ: {student_id} → Học sinh: **{ten_hs}**")
 
-                # Nếu có cột Tháng thì cho chọn
                 if "Tháng" in df.columns:
                     thang_list = sorted(df["Tháng"].unique())
                     selected_thang = st.selectbox("📅 Chọn tháng để xem kết quả", thang_list)
@@ -171,17 +165,10 @@ if df is not None:
 
                 st.dataframe(results, hide_index=True)
 
-                # Biểu đồ tiến bộ
                 if "Tháng" in df.columns and "Tổng điểm" in df.columns:
                     df_student = df[df["ID"] == str(student_id)].copy()
                     df_student["Tổng điểm"] = pd.to_numeric(df_student["Tổng điểm"], errors="coerce").fillna(0)
-                    fig = px.line(
-                        df_student,
-                        x="Tháng",
-                        y="Tổng điểm",
-                        title=f"📈 Biểu đồ tiến bộ của {ten_hs}",
-                        markers=True
-                    )
+                    fig = px.line(df_student, x="Tháng", y="Tổng điểm", title=f"📈 Biểu đồ tiến bộ của {ten_hs}", markers=True)
                     st.plotly_chart(fig)
 
                 if st.button("📋 Tạo nhận xét AI"):
@@ -189,7 +176,6 @@ if df is not None:
                     if nhan_xet:
                         st.success("✅ Nhận xét đã tạo:")
                         st.write(nhan_xet)
-
                         pdf_file = export_pdf(ten_hs, nhan_xet)
                         with open(pdf_file, "rb") as f:
                             b64 = base64.b64encode(f.read()).decode()
@@ -204,14 +190,9 @@ if df is not None:
 
         cols = ["ID", "Họ tên", "Tổng điểm"]
         df_filtered = df[[c for c in cols if c in df.columns]].copy()
-        if "Tổng điểm" in df_filtered.columns:
-            df_filtered["Tổng điểm"] = pd.to_numeric(df_filtered["Tổng điểm"], errors="coerce").fillna(0).astype(int)
+        df_filtered["Tổng điểm"] = pd.to_numeric(df_filtered["Tổng điểm"], errors="coerce").fillna(0).astype(int)
 
-        df_grouped = (
-            df_filtered.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm"]
-            .sum()
-            .sort_values(by="Tổng điểm", ascending=False)
-        )
+        df_grouped = df_filtered.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm"].sum().sort_values(by="Tổng điểm", ascending=False)
 
         def xep_loai(diem):
             if diem >= 800:
@@ -226,19 +207,40 @@ if df is not None:
         df_grouped["Xếp loại"] = df_grouped["Tổng điểm"].apply(xep_loai)
         st.dataframe(df_grouped, hide_index=True)
 
-        # Biểu đồ tổng thể
-        fig_class = px.bar(
-            df_grouped,
-            x="Họ tên",
-            y="Tổng điểm",
-            text="Tổng điểm",
-            title="📊 Tổng điểm toàn lớp",
-            color="Xếp loại"
-        )
+        fig_class = px.bar(df_grouped, x="Họ tên", y="Tổng điểm", text="Tổng điểm", title="📊 Tổng điểm toàn lớp", color="Xếp loại")
         st.plotly_chart(fig_class)
 
-        # Top 4
         st.subheader("🏆 Top 4 học sinh có tổng điểm cao nhất")
         st.dataframe(df_grouped.head(4), hide_index=True)
+
+        # ------------------ XUẤT PDF TOÀN LỚP ------------------
+        st.subheader("📄 Xuất nhận xét AI toàn lớp")
+
+        if st.button("🧠 Tạo và tải tất cả nhận xét PDF"):
+            all_comments = []
+            for _, row in df_grouped.iterrows():
+                ten_hs = row["Họ tên"]
+                hs_data = df[df["Họ tên"] == ten_hs]
+                nhan_xet = ai_nhan_xet(hs_data)
+                all_comments.append(f"Họ tên: {ten_hs}\n{nhan_xet}\n\n" + "-"*80 + "\n")
+
+            pdf = FPDF()
+            pdf.add_page()
+            font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+            pdf.add_font("DejaVu", "", font_path, uni=True)
+            pdf.set_font("DejaVu", "", 14)
+            pdf.cell(0, 10, "BÁO CÁO NHẬN XÉT HỌC SINH TOÀN LỚP", ln=True, align="C")
+            pdf.ln(10)
+            pdf.set_font("DejaVu", "", 11)
+            for comment in all_comments:
+                pdf.multi_cell(0, 8, comment)
+                pdf.ln(4)
+
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+            pdf.output(temp_file.name)
+            with open(temp_file.name, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+                href = f'<a href="data:application/pdf;base64,{b64}" download="nhan_xet_toan_lop.pdf">📘 Tải báo cáo toàn lớp (PDF)</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
 
