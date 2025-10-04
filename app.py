@@ -140,8 +140,6 @@ if df is not None:
             results = df[df["ID"] == str(student_id)]
             if not results.empty:
                 ten_hs = results["Họ tên"].iloc[0]
-
-                # 👉 Hiển thị tên học sinh ngay khi nhập ID
                 st.info(f"✅ ID hợp lệ: {student_id} → Học sinh: **{ten_hs}**")
 
                 st.subheader(f"📋 Kết quả học tập của {ten_hs} (ID: {student_id})")
@@ -183,8 +181,10 @@ if df is not None:
 
         df_filtered["Xếp loại"] = df_filtered["Tổng điểm"].apply(xep_loai)
 
-        # ✅ Hiển thị bảng thống kê lớp
-        st.dataframe(df_filtered)
+        # ✅ Hiển thị gọn 4 cột: ID, Họ tên, Tổng điểm, Xếp loại
+        cols_show = ["ID", "Họ tên", "Tổng điểm", "Xếp loại"]
+        df_show = df_filtered[[c for c in cols_show if c in df_filtered.columns]]
+        st.dataframe(df_show)
 
         # ✅ Thống kê vi phạm
         st.subheader("📈 Thống kê vi phạm theo tiêu chí")
@@ -222,4 +222,5 @@ if df is not None:
                 color="Họ tên"
             )
             st.plotly_chart(fig_top)
+
 
