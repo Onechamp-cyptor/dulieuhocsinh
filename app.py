@@ -8,7 +8,7 @@ import plotly.express as px
 # ---------------------------
 # ⚙️ Cấu hình Streamlit
 # ---------------------------
-st.set_page_config(page_title="Quản lý điểm học sinh", page_icon="📘", layout="wide")
+st.set_page_config(page_title="Tình hình học tập của học sinh", page_icon="📘", layout="wide")
 
 # ---------------------------
 # 🎨 CSS giao diện
@@ -52,7 +52,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📘 Quản lý điểm học sinh (Google Sheets + AI)")
+st.title("📘 Tình hình học tập của học sinh  (Google Sheets + AI)")
 
 # ---------------------------
 # 📊 Hàm tải dữ liệu Google Sheets
@@ -74,15 +74,15 @@ def load_data():
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
 
-        # 🧹 Xoá hàng trống thật sự
+        # 🧹 Xoá hàng trống thật sự (mọi ô đều rỗng)
         df = df[~df.apply(lambda row: all((str(x).strip() in ["", "None", "nan"]) for x in row), axis=1)]
 
         # ✅ Giữ lại hàng có ID hoặc Tuần
         if {"ID", "Tuần"}.issubset(df.columns):
             df = df[(df["ID"].notna()) | (df["Tuần"].notna())]
 
-        # ✅ Thay None / trống / “None” bằng ô rỗng thật sự
-        df = df.replace(["", None, "None"], "")
+        # Thay "" thành None
+        df = df.replace("", None)
 
         # ✅ Điền lại ID & Họ tên
         if {"ID", "Họ tên"}.issubset(df.columns):
@@ -103,8 +103,8 @@ def xu_ly_du_lieu(thong_tin):
         df[col] = df[col].replace({
             "✓": "Đạt (+20 điểm)",
             "X": "Chưa đạt (-30 điểm)",
-            None: "",
-            "": "",
+            None: "Không ghi nhận",
+            "": "Không ghi nhận",
             True: "Có (✓)",
             False: "Không"
         })
@@ -116,7 +116,6 @@ def xu_ly_du_lieu(thong_tin):
 def ai_nhan_xet(thong_tin):
     try:
         openai.api_key = st.secrets["openai"]["api_key"]
-
         data_quydoi = xu_ly_du_lieu(thong_tin)
 
         prompt = f"""
@@ -231,5 +230,4 @@ if df is not None:
 
             st.subheader("🏆 Top 4 học sinh có điểm rèn luyện cao nhất (Tuyên dương)")
             st.dataframe(top4[["ID", "Họ tên", "Tổng điểm rèn luyện"]])
-
 
