@@ -74,16 +74,16 @@ def load_data():
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
 
-        # 🧹 Xoá hàng trống thật sự
+        # 🧹 Xoá hàng trống hoàn toàn
         df = df[df.apply(lambda row: not all(str(x).strip() == "" for x in row), axis=1)]
 
-        # ✅ Điền lại ID và Họ tên (để hiện đủ T2–T7)
+        # ✅ Điền ID và Họ tên còn trống để không mất T2–T7
         if {"ID", "Họ tên"}.issubset(df.columns):
             df["ID"] = df["ID"].replace("", None)
             df["Họ tên"] = df["Họ tên"].replace("", None)
             df[["ID", "Họ tên"]] = df[["ID", "Họ tên"]].ffill()
 
-        # ✅ Thay None/nan thành trống
+        # ✅ Thay None/nan bằng trống
         df = df.replace(["None", "nan", None], "")
 
         return sheet, df
@@ -92,18 +92,6 @@ def load_data():
         st.exception(e)
         return None, None
 
-# ---------------------------
-# 🧮 Hàm xếp loại học sinh
-# ---------------------------
-def xep_loai(diem):
-    if diem >= 700:
-        return "Xuất sắc 🏆"
-    elif diem >= 500:
-        return "Tốt 👍"
-    elif diem >= 300:
-        return "Khá 💪"
-    else:
-        return "Cần cố gắng ⚠️"
 
 # ---------------------------
 # 🤖 Hàm AI nhận xét học sinh
@@ -145,6 +133,7 @@ def ai_nhan_xet(thong_tin):
         st.exception(e)
         return None
 
+
 # ---------------------------
 # 🧭 Giao diện chính
 # ---------------------------
@@ -163,7 +152,6 @@ if df is not None:
 
         if student_id:
             results = df[df["ID"] == str(student_id)]
-
             if not results.empty:
                 ten_hs = results["Họ tên"].iloc[0]
                 st.subheader(f"📌 Kết quả học tập của {ten_hs} (ID: {student_id})")
@@ -179,16 +167,20 @@ if df is not None:
 
     # ------------------ THỐNG KÊ ------------------
     elif menu == "Thống kê lớp":
-        st.header("📊 Thống kê lớp")
-        st.subheader("📉 Thống kê vi phạm theo tiêu chí")
+        st.subheader("📊 Thống kê lớp")
+
+        # ✅ Trung bình điểm rèn luyện
+        if "Tổng điểm rèn luyện" in df.columns:
+            st.metric("Điểm rèn luyện trung bình cả lớp", round(df["Tổng điểm rèn luyện"].mean(), 2))
 
         # ✅ Thống kê vi phạm
-        cols_check = ["Điểm danh", "Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
+        cols_check = ["Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
         vi_pham = {}
         for col in cols_check:
             if col in df.columns:
                 vi_pham[col] = (df[col] == "X").sum()
 
+        st.subheader("📉 Thống kê vi phạm theo tiêu chí")
         if vi_pham:
             fig = px.bar(
                 x=list(vi_pham.keys()),
@@ -198,43 +190,37 @@ if df is not None:
             )
             st.plotly_chart(fig)
 
-        # ✅ Top 4 học sinh có tổng điểm cao nhất + tiêu chí
-        if {"ID", "Họ tên", "Tổng điểm"}.issubset(df.columns):
-            top4 = (
-                df.groupby(["ID", "Họ tên"], as_index=False)
-                .agg({
-                    "Tổng điểm": "sum",
-                    "Điểm danh": lambda x: (x == "✓").sum(),
-                    "Đi học đúng giờ": lambda x: (x == "✓").sum(),
-                    "Đồng phục": lambda x: (x == "✓").sum(),
-                    "Thái độ học tập": lambda x: (x == "✓").sum(),
-                    "Trật tự": lambda x: (x == "✓").sum(),
-                    "Vệ sinh": lambda x: (x == "✓").sum(),
-                    "Phong trào": lambda x: (x == "✓").sum(),
-                })
-                .sort_values(by="Tổng điểm", ascending=False)
-                .head(4)
-            )
+        # ✅ Tổng hợp điểm theo từng học sinh
+        if {"ID", "Họ tên"}.issubset(df.columns):
+            diem_cols = ["Điểm danh", "Đi học đúng giờ", "Đồng phục", "Thái độ học tập",
+                         "Trật tự", "Vệ sinh", "Phong trào", "Tổng điểm rèn luyện"]
 
-            top4["Xếp loại"] = top4["Tổng điểm"].apply(xep_loai)
-            top4["Tổng điểm"] = top4["Tổng điểm"].astype(int)
+            diem_cols = [c for c in diem_cols if c in df.columns]
 
-            st.subheader("🏆 Top 4 học sinh có tổng điểm cao nhất")
-            st.dataframe(top4[
-                ["ID", "Họ tên", "Điểm danh", "Đi học đúng giờ", "Đồng phục",
-                 "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào",
-                 "Tổng điểm", "Xếp loại"]
-            ])
+            tong_diem = df.groupby(["ID", "Họ tên"], as_index=False)[diem_cols].sum(numeric_only=True)
+            tong_diem["Tổng điểm"] = tong_diem[diem_cols].sum(axis=1)
 
-            fig_top = px.bar(
-                top4,
-                x="Họ tên",
-                y="Tổng điểm",
-                text="Tổng điểm",
-                title="📊 Biểu đồ Top 4 học sinh có tổng điểm cao nhất",
-                color="Họ tên"
-            )
-            st.plotly_chart(fig_top)
+            def xep_loai(diem):
+                diem = float(diem)
+                if diem >= 700:
+                    return "Xuất sắc 🏆"
+                elif diem >= 500:
+                    return "Tốt 👍"
+                elif diem >= 400:
+                    return "Khá 😊"
+                else:
+                    return "Cần cố gắng ⚠️"
+
+            tong_diem["Xếp loại"] = tong_diem["Tổng điểm"].apply(xep_loai)
+            tong_diem["Tổng điểm"] = tong_diem["Tổng điểm"].astype(int)
+
+            # ✅ Top 4 học sinh điểm cao nhất
+            top4 = tong_diem.sort_values(by="Tổng điểm", ascending=False).head(4)
+
+            st.subheader("🏅 Top 4 học sinh có tổng điểm cao nhất")
+            st.dataframe(top4[["ID", "Họ tên", "Điểm danh", "Đi học đúng giờ", "Đồng phục",
+                               "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào",
+                               "Tổng điểm", "Xếp loại"]])
 
 
 
