@@ -102,32 +102,7 @@ def xu_ly_du_lieu(thong_tin):
     return df
 
 # ---------------------------
-# Hàm phân tích điểm môn học (cho AI dùng)
-# ---------------------------
-def phan_tich_mon_hoc(df):
-    ket_qua = {}
-    mon_hoc = ["Toán", "Ngữ Văn", "Tiếng Anh", "KHTN", "Lịch sử&Địa lí",
-               "Tin học", "Công nghệ", "Nghệ thuật", "GDCD", "GDTC",
-               "HĐTN HN", "GDĐP"]
-
-    for mon in mon_hoc:
-        if mon in df.columns:
-            try:
-                diem = pd.to_numeric(df[mon], errors="coerce").mean()
-                if pd.isna(diem):
-                    continue
-                elif diem >= 8:
-                    ket_qua[mon] = f"{diem:.1f} điểm → Học tập tốt"
-                elif diem >= 6:
-                    ket_qua[mon] = f"{diem:.1f} điểm → Có sự nỗ lực trong học tập"
-                else:
-                    ket_qua[mon] = f"{diem:.1f} điểm → Cần cố gắng thêm"
-            except:
-                continue
-    return ket_qua
-
-# ---------------------------
-# Hàm AI nhận xét học sinh
+# Hàm AI nhận xét học sinh (AI tự phân tích mềm mại)
 # ---------------------------
 def ai_nhan_xet(thong_tin):
     try:
@@ -135,33 +110,29 @@ def ai_nhan_xet(thong_tin):
 
         data_quydoi = xu_ly_du_lieu(thong_tin)
 
-        danh_gia = phan_tich_mon_hoc(thong_tin)
-
         prompt = f"""
-        Bạn là giáo viên chủ nhiệm. Đây là dữ liệu chi tiết của học sinh:
+        Bạn là giáo viên chủ nhiệm. Đây là dữ liệu chi tiết của học sinh (có điểm từng môn):
 
-        {data_quydoi.to_dict(orient="records")}
+        {thong_tin.to_dict(orient="records")}
 
-        Phân tích kết quả học tập theo từng môn (theo quy tắc):
+        Quy tắc phân tích:
         - Trên 8 điểm: học tập tốt
         - Từ 6 đến 8 điểm: có sự nỗ lực trong học tập
         - Dưới 5 điểm: cần cố gắng thêm
 
-        Kết quả học tập từng môn:
-        {danh_gia}
-
-        Hãy viết một nhận xét gửi phụ huynh, trong đó:
-        - Mở đầu: chào phụ huynh, giới thiệu mục đích thư.
-        - Nhận xét chi tiết về học tập dựa vào phân tích trên (nêu rõ từng môn).
+        Nhiệm vụ:
+        Hãy viết một nhận xét gửi phụ huynh theo phong cách mềm mại, tự nhiên, tránh liệt kê khô khan. 
+        - Mở đầu: chào phụ huynh và giới thiệu mục đích.
+        - Phân tích chung tình hình học tập, nêu môn nào em làm tốt, môn nào có sự nỗ lực, môn nào cần cố gắng thêm (AI tự diễn đạt dựa vào điểm).
         - Nêu ưu điểm và hạn chế chung.
-        - Nhận xét về thái độ, kỷ luật, vệ sinh, phong trào.
-        - Đưa ra lời khuyên cụ thể để giúp học sinh tiến bộ hơn.
+        - Nhận xét thêm về thái độ, kỷ luật, vệ sinh, phong trào.
+        - Kết thúc bằng lời khuyên thân thiện, tích cực dành cho phụ huynh.
         """
 
         resp = openai.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Bạn là một giáo viên chủ nhiệm tận tâm, viết nhận xét rõ ràng, thân thiện và chi tiết."},
+                {"role": "system", "content": "Bạn là giáo viên chủ nhiệm tận tâm, viết nhận xét rõ ràng, thân thiện, mượt mà và truyền cảm hứng."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=600
@@ -249,4 +220,5 @@ if df is not None:
 
             st.subheader("🏆 Top 4 học sinh điểm cao nhất (Tuyên dương)")
             st.dataframe(top4[["ID", "Họ tên", "Tổng điểm tuần"]])
+
 
