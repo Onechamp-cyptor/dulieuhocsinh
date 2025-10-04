@@ -159,10 +159,11 @@ def ai_nhan_xet(thong_tin):
         Kết quả học tập theo từng môn (đã phân loại):
         {danh_gia}
 
-        Hãy viết một nhận xét gửi phụ huynh, trong đó:
-        - Nêu ưu điểm và hạn chế của học sinh.
-        - Nhận xét về học tập (dựa vào phân loại môn học trên), thái độ, kỷ luật, vệ sinh, tham gia phong trào...
-        - Đưa ra lời khuyên cụ thể để giúp học sinh tiến bộ hơn.
+        Yêu cầu khi viết nhận xét gửi phụ huynh:
+        1. Liệt kê rõ kết quả từng môn học với điểm trung bình và xếp loại (Giỏi / Cần cố gắng thêm / Cần nỗ lực nhiều).
+        2. Nêu ưu điểm và hạn chế của học sinh.
+        3. Nhận xét về thái độ, kỷ luật, vệ sinh, tham gia phong trào...
+        4. Đưa ra lời khuyên cụ thể để giúp học sinh tiến bộ hơn.
         """
 
         resp = openai.chat.completions.create(
@@ -171,7 +172,7 @@ def ai_nhan_xet(thong_tin):
                 {"role": "system", "content": "Bạn là một giáo viên chủ nhiệm tận tâm, viết nhận xét rõ ràng, thân thiện và chi tiết."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=400
+            max_tokens=500
         )
         return resp.choices[0].message.content
 
@@ -219,6 +220,12 @@ if df is not None:
 
                 # Nhận xét AI
                 if st.button("📌 Nhận xét phụ huynh"):
+                    # Hiển thị bảng phân loại môn học
+                    st.subheader("📊 Kết quả phân loại môn học")
+                    dg = danh_gia_mon_hoc(results)
+                    st.table(pd.DataFrame(dg.items(), columns=["Môn học", "Đánh giá"]))
+
+                    # Gọi AI nhận xét
                     nhan_xet = ai_nhan_xet(results)
                     if nhan_xet:
                         st.success("✅ Nhận xét đã tạo:")
