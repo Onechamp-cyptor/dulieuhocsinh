@@ -2,6 +2,7 @@
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
+import openai
 import plotly.express as px
 
 # ---------------------------
@@ -73,10 +74,10 @@ def load_data():
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
 
-        # 🧹 Dọn dữ liệu
+        # 🧹 Xoá hàng trống thật sự
         df = df[df.apply(lambda row: not all(str(x).strip() == "" for x in row), axis=1)]
 
-        # ✅ Điền ID và Họ tên bị trống
+        # ✅ Tự động điền ID và Họ tên bị trống (để hiện đủ T2–T7)
         if {"ID", "Họ tên"}.issubset(df.columns):
             df["ID"] = df["ID"].replace("", None)
             df["Họ tên"] = df["Họ tên"].replace("", None)
@@ -85,18 +86,51 @@ def load_data():
         # ✅ Xử lý None/nan => trống
         df = df.replace(["None", "nan", None], "")
 
-        # ✅ Chuyển kiểu số cho “Tổng điểm”
-        if "Tổng điểm" in df.columns:
-            df["Tổng điểm"] = pd.to_numeric(df["Tổng điểm"], errors="coerce").fillna(0)
-        else:
-            df["Tổng điểm"] = 0
-
         return sheet, df
-
     except Exception as e:
         st.error("❌ Lỗi tải dữ liệu Google Sheets")
         st.exception(e)
         return None, None
+
+# ---------------------------
+# 🤖 Hàm AI nhận xét học sinh
+# ---------------------------
+def ai_nhan_xet(thong_tin):
+    try:
+        openai.api_key = st.secrets["openai"]["api_key"]
+
+        prompt = f"""
+        Bạn là giáo viên chủ nhiệm. Đây là dữ liệu chi tiết của học sinh (có điểm từng môn):
+
+        {thong_tin.to_dict(orient="records")}
+
+        Quy tắc phân tích:
+        - Trên 8 điểm: học tập tốt
+        - Từ 6 đến 8 điểm: có sự nỗ lực trong học tập
+        - Dưới 5 điểm: cần cố gắng thêm
+
+        Nhiệm vụ:
+        Hãy viết một nhận xét gửi phụ huynh theo phong cách mềm mại, tự nhiên, tránh liệt kê khô khan. 
+        - Mở đầu: chào phụ huynh và giới thiệu mục đích.
+        - Phân tích chung tình hình học tập, nêu môn nào em làm tốt, môn nào có sự nỗ lực, môn nào cần cố gắng thêm.
+        - Nêu ưu điểm, hạn chế, thái độ, kỷ luật, vệ sinh, phong trào.
+        - Kết thúc bằng lời khuyên thân thiện, tích cực dành cho phụ huynh.
+        """
+
+        resp = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Bạn là giáo viên chủ nhiệm tận tâm, viết nhận xét thân thiện, tự nhiên, truyền cảm hứng."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=600
+        )
+        return resp.choices[0].message.content
+
+    except Exception as e:
+        st.error("❌ Lỗi khi gọi OpenAI API")
+        st.exception(e)
+        return None
 
 # ---------------------------
 # 🧭 Giao diện chính
@@ -116,19 +150,57 @@ if df is not None:
 
         if student_id:
             results = df[df["ID"] == str(student_id)]
+
             if not results.empty:
                 ten_hs = results["Họ tên"].iloc[0]
-                st.subheader(f"📋 Kết quả học tập của {ten_hs} (ID: {student_id})")
+                st.subheader(f"📌 Kết quả học tập của {ten_hs} (ID: {student_id})")
+
                 st.dataframe(results)
+
+                if st.button("📋 Nhận xét"):
+                    nhan_xet = ai_nhan_xet(results)
+                    if nhan_xet:
+                        st.success("✅ Nhận xét đã tạo:")
+                        st.write(nhan_xet)
             else:
                 st.info("⚠️ Không tìm thấy học sinh")
 
     # ------------------ THỐNG KÊ ------------------
     elif menu == "Thống kê lớp":
-        st.header("📊 Thống kê lớp")
+        st.subheader("📊 Thống kê lớp")
 
-        # Thống kê vi phạm
-        st.subheader("📉 Thống kê vi phạm theo tiêu chí")
+        # ✅ Trung bình rèn luyện
+        if "Tổng điểm rèn luyện" in df.columns:
+            st.metric("Điểm rèn luyện trung bình cả lớp", round(df["Tổng điểm rèn luyện"].astype(float).mean(), 2))
+
+        # ✅ Thống kê toàn bộ học sinh
+        if {"ID", "Họ tên", "Tổng điểm rèn luyện"}.issubset(df.columns):
+            tong_hs = (
+                df.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm rèn luyện"]
+                .sum()
+                .sort_values(by="Tổng điểm rèn luyện", ascending=False)
+            )
+
+            tong_hs["Tổng điểm rèn luyện"] = tong_hs["Tổng điểm rèn luyện"].astype(float)
+            tong_hs["Xếp loại"] = tong_hs["Tổng điểm rèn luyện"].apply(
+                lambda x: "Tốt" if x >= 500 else ("Khá" if x >= 400 else "Trung bình")
+            )
+
+            st.subheader("📋 Thống kê toàn bộ học sinh")
+            st.dataframe(tong_hs)
+
+            # Biểu đồ top học sinh
+            fig_top = px.bar(
+                tong_hs.head(10),
+                x="Họ tên",
+                y="Tổng điểm rèn luyện",
+                color="Xếp loại",
+                text="Tổng điểm rèn luyện",
+                title="🏆 Top học sinh có điểm rèn luyện cao nhất"
+            )
+            st.plotly_chart(fig_top)
+
+        # ✅ Biểu đồ thống kê vi phạm
         cols_check = ["Đi học đúng giờ", "Đồng phục", "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào"]
         vi_pham = {}
         for col in cols_check:
@@ -136,34 +208,11 @@ if df is not None:
                 vi_pham[col] = (df[col] == "X").sum()
 
         if vi_pham:
-            fig = px.bar(
+            st.subheader("📉 Thống kê vi phạm theo tiêu chí")
+            fig_vp = px.bar(
                 x=list(vi_pham.keys()),
                 y=list(vi_pham.values()),
                 labels={"x": "Tiêu chí", "y": "Số lần vi phạm"},
                 title="📌 Số lần vi phạm trong toàn lớp"
             )
-            st.plotly_chart(fig)
-
-        # 🏆 Top học sinh có Tổng điểm cao nhất
-        st.subheader("🏆 Top 4 học sinh có tổng điểm cao nhất")
-        if {"ID", "Họ tên", "Tổng điểm"}.issubset(df.columns):
-            top4 = (
-                df.groupby(["ID", "Họ tên"], as_index=False)["Tổng điểm"]
-                .max()
-                .sort_values(by="Tổng điểm", ascending=False)
-                .head(4)
-            )
-
-            # ✅ Lấy thêm các tiêu chí cần hiển thị
-            display_cols = ["ID", "Họ tên", "Điểm danh", "Đi học đúng giờ", "Đồng phục",
-                            "Thái độ học tập", "Trật tự", "Vệ sinh", "Phong trào", "Tổng điểm", "Xếp loại"]
-            display_cols = [c for c in display_cols if c in df.columns]
-
-            top4_full = pd.merge(top4, df[display_cols], on=["ID", "Họ tên"], how="left")
-
-            st.dataframe(top4_full[display_cols])
-
-
-
-
-
+            st.plotly_chart(fig_vp)
