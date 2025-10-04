@@ -8,7 +8,7 @@ import plotly.express as px
 # ---------------------------
 # ⚙️ Cấu hình Streamlit
 # ---------------------------
-st.set_page_config(page_title="Quản lý điểm học sinh", page_icon="📘", layout="wide")
+st.set_page_config(page_title="Tình hình học tập của học sinh", page_icon="📘", layout="wide")
 
 # ---------------------------
 # 🎨 CSS giao diện
@@ -52,7 +52,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📘 Quản lý điểm học sinh (Google Sheets + AI)")
+st.title("📘 Tình hình học tập của học sinh (Google Sheets + AI)")
 
 # ---------------------------
 # 📊 Hàm tải dữ liệu Google Sheets
