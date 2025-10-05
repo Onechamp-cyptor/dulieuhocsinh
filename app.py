@@ -86,38 +86,41 @@ def load_data():
         st.exception(e)
         return None, None
 
+
 # ---------------------------
-# 🤖 Hàm AI nhận xét học sinh
+# 🤖 Hàm AI nhận xét gửi phụ huynh
 # ---------------------------
 def ai_nhan_xet(thong_tin):
     try:
         openai.api_key = st.secrets["openai"]["api_key"]
         prompt = f"""
-        Bạn là giáo viên chủ nhiệm. Đây là dữ liệu chi tiết của học sinh:
+        Bạn là giáo viên chủ nhiệm. Dưới đây là dữ liệu học tập và rèn luyện của học sinh:
 
         {thong_tin.to_dict(orient="records")}
 
-        Quy tắc phân tích:
-        - Trên 8 điểm: học tập tốt
-        - Từ 6 đến 8 điểm: có sự nỗ lực
-        - Dưới 5 điểm: cần cố gắng thêm
-
-        Hãy viết nhận xét thân thiện, có tính giáo dục và động viên.
+        Hãy viết **một đoạn nhận xét gửi đến phụ huynh học sinh** với yêu cầu sau:
+        - Mở đầu bằng lời chào: “Kính gửi quý phụ huynh em [Tên học sinh],”
+        - Giọng văn nhẹ nhàng, tôn trọng, mang tính giáo dục và động viên.
+        - Nêu rõ ưu điểm, tinh thần học tập, thái độ rèn luyện của học sinh.
+        - Nếu có hạn chế, hãy diễn đạt khéo léo để phụ huynh hiểu và đồng hành cùng con.
+        - Cuối đoạn có thể thêm lời cảm ơn phụ huynh đã quan tâm, phối hợp cùng nhà trường.
+        - Không xưng “em” trực tiếp với học sinh, thay bằng “em [Tên]”, “học sinh”, hoặc “cháu”.
         """
 
         resp = openai.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Bạn là giáo viên chủ nhiệm tận tâm, viết nhận xét ngắn gọn, truyền cảm hứng."},
+                {"role": "system", "content": "Bạn là giáo viên chủ nhiệm tận tâm, viết thư nhận xét gửi đến phụ huynh học sinh, giọng văn thân thiện, lịch sự và khích lệ."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=600
+            max_tokens=700
         )
         return resp.choices[0].message.content
     except Exception as e:
-        st.error("❌ Lỗi gọi OpenAI API")
+        st.error("❌ Lỗi khi tạo nhận xét AI gửi phụ huynh")
         st.exception(e)
         return None
+
 
 # ---------------------------
 # 🧾 Hàm xuất PDF tiếng Việt (dùng fpdf2)
@@ -129,14 +132,15 @@ def export_pdf(ten_hs, nhan_xet):
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
     pdf.add_font("DejaVu", "", font_path, uni=True)
     pdf.set_font("DejaVu", "", 14)
-    pdf.cell(0, 10, "NHẬN XÉT HỌC SINH", ln=True, align="C")
+    pdf.cell(0, 10, "THƯ NHẬN XÉT GỬI PHỤ HUYNH", ln=True, align="C")
     pdf.ln(10)
     pdf.set_font("DejaVu", "", 12)
-    pdf.multi_cell(0, 8, f"Họ và tên: {ten_hs}\n\nNhận xét:\n{nhan_xet}")
+    pdf.multi_cell(0, 8, f"Học sinh: {ten_hs}\n\n{nhan_xet}")
 
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     pdf.output(temp_file.name)
     return temp_file.name
+
 
 # ---------------------------
 # 🧭 Giao diện chính
@@ -174,7 +178,7 @@ if df is not None:
                 if st.button("📋 Nhận xét"):
                     nhan_xet = ai_nhan_xet(results)
                     if nhan_xet:
-                        st.success("✅ Nhận xét đã tạo:")
+                        st.success("✅ Nhận xét đã tạo (gửi phụ huynh):")
                         st.write(nhan_xet)
                         pdf_file = export_pdf(ten_hs, nhan_xet)
                         with open(pdf_file, "rb") as f:
@@ -229,7 +233,7 @@ if df is not None:
             font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
             pdf.add_font("DejaVu", "", font_path, uni=True)
             pdf.set_font("DejaVu", "", 14)
-            pdf.cell(0, 10, "BÁO CÁO NHẬN XÉT HỌC SINH TOÀN LỚP", ln=True, align="C")
+            pdf.cell(0, 10, "BÁO CÁO NHẬN XÉT GỬI PHỤ HUYNH TOÀN LỚP", ln=True, align="C")
             pdf.ln(10)
             pdf.set_font("DejaVu", "", 11)
             for comment in all_comments:
@@ -242,5 +246,6 @@ if df is not None:
                 b64 = base64.b64encode(f.read()).decode()
                 href = f'<a href="data:application/pdf;base64,{b64}" download="nhan_xet_toan_lop.pdf">📘 Tải báo cáo toàn lớp (PDF)</a>'
                 st.markdown(href, unsafe_allow_html=True)
+
 
 
