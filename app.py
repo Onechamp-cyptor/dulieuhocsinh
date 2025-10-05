@@ -51,7 +51,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📘 Tình hình học tập của học sinh (Google Sheets + AI)")
+st.title("📘 Tình hình học tập của học sinh)")
 
 # ---------------------------
 # 📊 Hàm tải dữ liệu Google Sheets
@@ -171,7 +171,7 @@ if df is not None:
                     fig = px.line(df_student, x="Tháng", y="Tổng điểm", title=f"📈 Biểu đồ tiến bộ của {ten_hs}", markers=True)
                     st.plotly_chart(fig)
 
-                if st.button("📋 Tạo nhận xét AI"):
+                if st.button("📋 Nhận xét"):
                     nhan_xet = ai_nhan_xet(results)
                     if nhan_xet:
                         st.success("✅ Nhận xét đã tạo:")
