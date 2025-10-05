@@ -51,7 +51,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📘 Tình hình học tập của học sinh)")
+st.title("📘 Tình hình học tập của học sinh")
 
 # ---------------------------
 # 📊 Hàm tải dữ liệu Google Sheets
