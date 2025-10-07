@@ -54,7 +54,7 @@ st.markdown("""
 st.title("📘 Tình hình học tập và rèn luyện của học sinh")
 
 # ---------------------------
-# 📊 Hàm tải dữ liệu Google Sheets
+# 📊 Hàm tải dữ liệu Google Sheets (ĐÃ CHỈNH)
 # ---------------------------
 def load_data():
     try:
@@ -72,20 +72,31 @@ def load_data():
 
         data = sheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
+
+        # 🔹 Bỏ dòng trống hoàn toàn
         df = df[df.apply(lambda row: not all(str(x).strip() == "" for x in row), axis=1)]
 
+        # 🔹 Điền lại các ô trống cho ID và Họ tên (để các dòng của 1 học sinh nối tiếp nhau)
         if {"ID", "Họ tên"}.issubset(df.columns):
             df["ID"] = df["ID"].replace("", None)
             df["Họ tên"] = df["Họ tên"].replace("", None)
             df[["ID", "Họ tên"]] = df[["ID", "Họ tên"]].ffill()
 
+        # 🔹 Chuẩn hoá cột Tháng và Tuần để tránh lỗi không hiển thị
+        for col in ["Tháng", "Tuần"]:
+            if col in df.columns:
+                df[col] = df[col].astype(str).str.strip().replace(["", "None", "nan"], None)
+                df[col] = df[col].ffill()  # điền các ô trống cùng nhóm
+                df[col] = pd.to_numeric(df[col], errors="coerce")  # ép kiểu về số (vd: 1, 2, 3,...)
+
+        # 🔹 Thay thế toàn bộ "None"/"nan" bằng rỗng
         df = df.replace(["None", "nan", None], "")
+
         return sheet, df
     except Exception as e:
         st.error("❌ Lỗi tải dữ liệu Google Sheets")
         st.exception(e)
         return None, None
-
 
 # ---------------------------
 # 🤖 Hàm AI nhận xét gửi phụ huynh
@@ -121,14 +132,12 @@ def ai_nhan_xet(thong_tin):
         st.exception(e)
         return None
 
-
 # ---------------------------
-# 🧾 Hàm xuất PDF tiếng Việt (dùng fpdf2)
+# 🧾 Hàm xuất PDF tiếng Việt
 # ---------------------------
 def export_pdf(ten_hs, nhan_xet):
     pdf = FPDF()
     pdf.add_page()
-
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
     pdf.add_font("DejaVu", "", font_path, uni=True)
     pdf.set_font("DejaVu", "", 14)
@@ -140,7 +149,6 @@ def export_pdf(ten_hs, nhan_xet):
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     pdf.output(temp_file.name)
     return temp_file.name
-
 
 # ---------------------------
 # 🧭 Giao diện chính
@@ -162,8 +170,9 @@ if df is not None:
                 ten_hs = results["Họ tên"].iloc[0]
                 st.info(f"✅ ID hợp lệ: {student_id} → Học sinh: **{ten_hs}**")
 
+                # Hiển thị danh sách tháng hợp lệ
                 if "Tháng" in df.columns:
-                    thang_list = sorted(df["Tháng"].unique())
+                    thang_list = sorted([int(x) for x in df["Tháng"].dropna().unique() if str(x).isdigit()])
                     selected_thang = st.selectbox("📅 Chọn tháng để xem kết quả", thang_list)
                     results = results[results["Tháng"] == selected_thang]
 
