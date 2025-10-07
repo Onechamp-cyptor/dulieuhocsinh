@@ -12,7 +12,7 @@ import os
 # ---------------------------
 # ⚙️ Cấu hình Streamlit
 # ---------------------------
-st.set_page_config(page_title="Tình hình học tập của học sinh", page_icon="📘", layout="wide")
+st.set_page_config(page_title="Tình hình học tập và rèn luyện  của học sinh", page_icon="📘", layout="wide")
 
 # ---------------------------
 # 🎨 CSS giao diện
@@ -51,7 +51,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📘 Tình hình học tập của học sinh")
+st.title("📘 Tình hình học tập và rèn luyện của học sinh")
 
 # ---------------------------
 # 📊 Hàm tải dữ liệu Google Sheets
